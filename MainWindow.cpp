@@ -1,32 +1,63 @@
 #include "MainWindow.h"
 #include "ui_MainWindow.h"
-#include <QFileInfo>
+#include "BusinessLogic.h"
+#include <QFileDialog>
+#include <QMessageBox>
+#include <QDateTime>
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
-    , tcpSocket(new QTcpSocket(this))
+    , m_businessLogic(new BusinessLogic)
+    , m_businessThread(new QThread(this))
 {
     ui->setupUi(this);
 
     // ==================== НАСТРОЙКА НАЧАЛЬНОГО СОСТОЯНИЯ ====================
 
-    // Настройка текстовых подсказок
     ui->messageLineEdit->setPlaceholderText("Enter message to send...");
 
+    // ==================== НАСТРОЙКА ПОТОКА ДЛЯ БИЗНЕС-ЛОГИКИ ====================
+
+    // Перемещаем бизнес-логику в отдельный поток
+    m_businessLogic->moveToThread(m_businessThread);
+
+    // Запускаем поток
+    m_businessThread->start();
+
+    // ==================== НАСТРОЙКА СОЕДИНЕНИЙ ====================
+
+    setupConnections();
+
+    // ==================== ИНИЦИАЛИЗАЦИЯ СОСТОЯНИЯ ====================
+
+    updateSendButtonState();
+    updateImageButtonsState();
+}
+
+MainWindow::~MainWindow()
+{
+    // Корректное завершение потока
+    m_businessThread->quit();
+    m_businessThread->wait(1000); // Ждем до 1 секунды для завершения
+
+    if (m_businessThread->isRunning()) {
+        m_businessThread->terminate();
+        m_businessThread->wait();
+    }
+
+    delete m_businessLogic;
+    delete ui;
+}
+
+// ==================== НАСТРОЙКА СОЕДИНЕНИЙ МЕЖДУ GUI И БИЗНЕС-ЛОГИКОЙ ====================
+
+void MainWindow::setupConnections()
+{
     // ==================== СОЕДИНЕНИЯ ДЛЯ ВКЛАДКИ "СОКЕТ" ====================
 
-    // Управление подключением
     connect(ui->connectButton, &QPushButton::clicked, this, &MainWindow::onConnectClicked);
     connect(ui->disconnectButton, &QPushButton::clicked, this, &MainWindow::onDisconnectClicked);
-
-    // Обработка событий сокета
-    connect(tcpSocket, &QTcpSocket::connected, this, &MainWindow::onSocketConnected);
-    connect(tcpSocket, &QTcpSocket::disconnected, this, &MainWindow::onSocketDisconnected);
-    connect(tcpSocket, &QTcpSocket::errorOccurred, this, &MainWindow::onSocketError);
-    connect(tcpSocket, &QTcpSocket::readyRead, this, &MainWindow::onSocketReadyRead);
-
-    // Элементы управления логом
     connect(ui->clearLogButton, &QPushButton::clicked, this, &MainWindow::onClearLogClicked);
     connect(ui->sendMessageButton, &QPushButton::clicked, this, &MainWindow::onSendMessageClicked);
     connect(ui->messageLineEdit, &QLineEdit::textChanged, this, &MainWindow::onMessageTextChanged);
@@ -37,18 +68,15 @@ MainWindow::MainWindow(QWidget* parent)
     connect(ui->processImageButton, &QPushButton::clicked, this, &MainWindow::onProcessImageClicked);
     connect(ui->clearImageButton, &QPushButton::clicked, this, &MainWindow::onClearImageClicked);
 
-    // ==================== ИНИЦИАЛИЗАЦИЯ СОСТОЯНИЯ ====================
+    // ==================== СОЕДИНЕНИЯ С БИЗНЕС-ЛОГИКОЙ ====================
 
-    updateSendButtonState();
-    updateImageButtonsState();
-
-    logMessage("Vision System GUI initialized");
-    logMessage("Ready to work with sockets and image processing");
-}
-
-MainWindow::~MainWindow()
-{
-    delete ui;
+    // Сигналы от бизнес-логики к GUI
+    connect(m_businessLogic, &BusinessLogic::logMessage, this, &MainWindow::onLogMessage);
+    connect(m_businessLogic, &BusinessLogic::connectionStateChanged, this, &MainWindow::onConnectionStateChanged);
+    connect(m_businessLogic, &BusinessLogic::imageLoaded, this, &MainWindow::onImageLoaded);
+    connect(m_businessLogic, &BusinessLogic::imageProcessed, this, &MainWindow::onImageProcessed);
+    connect(m_businessLogic, &BusinessLogic::imageCleared, this, &MainWindow::onImageCleared);
+    connect(m_businessLogic, &BusinessLogic::socketError, this, &MainWindow::onSocketError);
 }
 
 // ==================== РЕАЛИЗАЦИЯ СЛОТОВ ДЛЯ ВКЛАДКИ "СОКЕТ" ====================
@@ -57,65 +85,25 @@ void MainWindow::onConnectClicked()
 {
     QString ip = ui->ipLineEdit->text();
     quint16 port = static_cast<quint16>(ui->portSpinBox->value());
-
-    logMessage(QString("Connecting to %1:%2...").arg(ip).arg(port));
-    tcpSocket->connectToHost(ip, port);
+    m_businessLogic->connectToHost(ip, port);
 }
 
 void MainWindow::onDisconnectClicked()
 {
-    tcpSocket->disconnectFromHost();
-}
-
-void MainWindow::onSocketConnected()
-{
-    logMessage("Connected to server");
-    ui->connectButton->setEnabled(false);
-    ui->disconnectButton->setEnabled(true);
-    updateSendButtonState();
-}
-
-void MainWindow::onSocketDisconnected()
-{
-    logMessage("Disconnected from server");
-    ui->connectButton->setEnabled(true);
-    ui->disconnectButton->setEnabled(false);
-    updateSendButtonState();
-}
-
-void MainWindow::onSocketError(QAbstractSocket::SocketError error)
-{
-    Q_UNUSED(error)
-        logMessage(QString("Socket error: %1").arg(tcpSocket->errorString()));
-}
-
-void MainWindow::onSocketReadyRead()
-{
-    QByteArray data = tcpSocket->readAll();
-    QString message = QString::fromUtf8(data).trimmed();
-    logMessage(QString("Received: %1").arg(message));
+    m_businessLogic->disconnectFromHost();
 }
 
 void MainWindow::onClearLogClicked()
 {
     ui->logTextEdit->clear();
-    logMessage("Log cleared");
+    onLogMessage("Log cleared");
 }
 
 void MainWindow::onSendMessageClicked()
 {
     QString message = ui->messageLineEdit->text().trimmed();
-
-    if (!message.isEmpty() && tcpSocket->state() == QAbstractSocket::ConnectedState) {
-        QByteArray data = message.toUtf8() + '\n';
-        tcpSocket->write(data);
-
-        logMessage(QString("Sent: %1").arg(message));
-        ui->messageLineEdit->clear();
-    }
-    else if (!message.isEmpty()) {
-        logMessage("Cannot send message - not connected to server");
-    }
+    m_businessLogic->sendMessage(message);
+    ui->messageLineEdit->clear();
 }
 
 void MainWindow::onMessageTextChanged(const QString& text)
@@ -128,107 +116,99 @@ void MainWindow::onMessageTextChanged(const QString& text)
 
 void MainWindow::onLoadImageClicked()
 {
-    // Открываем диалог выбора файла
     QString fileName = QFileDialog::getOpenFileName(this,
         "Select Image",
         "",
-        "Images (*.png *.jpg *.jpeg *.bmp *.tiff);;All files (*.*)");
+        "Images (*.png *.jpg *.jpeg *.bmp *.tiff);;PDF files (*.pdf);;All files (*.*)");
 
     if (!fileName.isEmpty()) {
-        QPixmap image(fileName);
-        if (!image.isNull()) {
-            currentImage = image;
-            currentImagePath = fileName;
-
-            // Масштабируем изображение для превью с сохранением пропорций
-            QPixmap preview = image.scaled(ui->imagePreviewLabel->width() - 20,
-                ui->imagePreviewLabel->height() - 20,
-                Qt::KeepAspectRatio,
-                Qt::SmoothTransformation);
-
-            // Устанавливаем превью и обновляем интерфейс
-            ui->imagePreviewLabel->setPixmap(preview);
-            ui->imagePathLabel->setText(QFileInfo(fileName).fileName());
-
-            // Обновляем состояние кнопок и логируем событие
-            updateImageButtonsState();
-            logMessage("Image loaded: " + fileName);
-
-            // Переключаемся на вкладку с изображением для удобства пользователя
-            ui->tabWidget->setCurrentIndex(1);
-        }
-        else {
-            // Обработка ошибки загрузки изображения
-            logMessage("Error loading image: " + fileName);
-            QMessageBox::warning(this, "Error", "Failed to load image");
-        }
+        m_businessLogic->loadImage(fileName);
     }
 }
 
 void MainWindow::onProcessImageClicked()
 {
-    if (!currentImage.isNull()) {
-        logMessage("Started image processing: " + currentImagePath);
-
-        // Временно отключаем кнопку обработки, но не меняем её текст
-        ui->processImageButton->setEnabled(false);
-
-        // Имитация длительной обработки изображения
-        // В реальном приложении здесь будет ваш алгоритм обработки
-        QTimer::singleShot(2000, this, [this]() {
-            logMessage("Image processing completed");
-
-            // Восстанавливаем кнопку в исходное состояние
-            ui->processImageButton->setEnabled(true);
-
-            // Переключаемся на вкладку результатов
-            ui->tabWidget->setCurrentIndex(2);
-            logMessage("Results ready on Results tab");
-
-            // Здесь можно добавить логику отображения результатов обработки
-            // Например, вывод углов, статистики и т.д.
-            });
-    }
+    ui->processImageButton->setEnabled(false);
+    m_businessLogic->processImage();
 }
 
 void MainWindow::onClearImageClicked()
 {
-    // Очищаем текущее изображение и связанные данные
-    currentImage = QPixmap();
-    currentImagePath.clear();
-
-    // Сбрасываем превью и текстовые метки
-    ui->imagePreviewLabel->clear();
-    ui->imagePreviewLabel->setText("Image Preview");
-    ui->imagePathLabel->setText("No file selected");
-
-    // Обновляем состояние кнопок и логируем действие
-    updateImageButtonsState();
-    logMessage("Image cleared");
+    m_businessLogic->clearImage();
 }
 
-// ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
+// ==================== СЛОТЫ ДЛЯ ОБРАБОТКИ СИГНАЛОВ ОТ БИЗНЕС-ЛОГИКИ ====================
 
-void MainWindow::logMessage(const QString& message)
+void MainWindow::onLogMessage(const QString& message)
 {
-    // Добавляем сообщение в лог с временной меткой
     QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss");
     ui->logTextEdit->append(QString("[%1] %2").arg(timestamp, message));
 }
 
+void MainWindow::onConnectionStateChanged(bool connected)
+{
+    ui->connectButton->setEnabled(!connected);
+    ui->disconnectButton->setEnabled(connected);
+    updateSendButtonState();
+}
+
+void MainWindow::onImageLoaded(const QPixmap& originalImage, const QString& fileName)
+{
+    // 1. Получаем размеры imagePreviewLabel
+    QSize labelSize = ui->imagePreviewLabel->size();
+
+    // 2. Получаем размеры исходного изображения
+    QSize imageSize = originalImage.size();
+
+    // 3. Вычисляем масштабирование чтобы изображение вписывалось в label
+    QPixmap scaledImage = originalImage.scaled(
+        labelSize.width() - 10,    // -10 для небольших отступов
+        labelSize.height() - 10,
+        Qt::KeepAspectRatio,       // Сохраняем пропорции
+        Qt::SmoothTransformation   // Плавное масштабирование
+    );
+
+    // 4. Устанавливаем масштабированное изображение
+    ui->imagePreviewLabel->setPixmap(scaledImage);
+    ui->imagePathLabel->setText(fileName);
+
+    // Остальной код без изменений
+    updateImageButtonsState();
+    ui->tabWidget->setCurrentIndex(1);
+}
+
+void MainWindow::onImageProcessed()
+{
+    ui->processImageButton->setEnabled(true);
+    ui->tabWidget->setCurrentIndex(2);
+}
+
+void MainWindow::onImageCleared()
+{
+    ui->imagePreviewLabel->clear();
+    ui->imagePreviewLabel->setText("Image Preview");
+    ui->imagePathLabel->setText("No file selected");
+    updateImageButtonsState();
+}
+
+void MainWindow::onSocketError(const QString& error)
+{
+    QMessageBox::warning(this, "Error", error);
+}
+
+// ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
+
 void MainWindow::updateSendButtonState()
 {
-    // Обновляем состояние кнопки отправки в зависимости от подключения и наличия текста
     bool hasText = !ui->messageLineEdit->text().trimmed().isEmpty();
-    bool isConnected = (tcpSocket->state() == QAbstractSocket::ConnectedState);
+    bool isConnected = ui->disconnectButton->isEnabled();
 
     ui->sendMessageButton->setEnabled(hasText && isConnected);
 }
 
 void MainWindow::updateImageButtonsState()
 {
-    // Обновляем состояние кнопок в зависимости от наличия загруженного изображения
-    bool hasImage = !currentImage.isNull();
+    bool hasImage = !ui->imagePathLabel->text().isEmpty() && ui->imagePathLabel->text() != "No file selected";
     ui->processImageButton->setEnabled(hasImage);
     ui->clearImageButton->setEnabled(hasImage);
 }

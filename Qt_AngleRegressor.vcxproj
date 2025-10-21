@@ -73,6 +73,7 @@
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <DisableLanguageExtensions>true</DisableLanguageExtensions>
       <AdditionalIncludeDirectories>C:\Qt\6.10.0\msvc2022_64\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>QT_PDF_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>C:\Qt\6.10.0\msvc2022_64\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -89,6 +90,7 @@
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <DisableLanguageExtensions>true</DisableLanguageExtensions>
       <AdditionalIncludeDirectories>C:\Qt\6.10.0\msvc2022_64\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>QT_PDF_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>C:\Qt\6.10.0\msvc2022_64\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -125,11 +127,19 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <QtUic Include="MainWindow.ui" />
+    <ClCompile Include="BusinessLogic.cpp" />
+    <ClCompile Include="ImageLoader.cpp" />
     <ClCompile Include="MainWindow.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="MainWindow.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <QtMoc Include="BusinessLogic.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ImageLoader.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">

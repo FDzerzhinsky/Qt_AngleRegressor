@@ -1,16 +1,11 @@
 #pragma once
 
 #include <QMainWindow>
-#include <QTcpSocket>
-#include <QTimer>
-#include <QDateTime>
-#include <QPixmap>
-#include <QFileDialog>
-#include <QMessageBox>
+#include <QThread>
 
-QT_BEGIN_NAMESPACE
+// Предварительное объявление классов
+class BusinessLogic;
 namespace Ui { class MainWindow; }
-QT_END_NAMESPACE
 
 class MainWindow : public QMainWindow
 {
@@ -24,10 +19,6 @@ private slots:
     // ==================== СЛОТЫ ДЛЯ ВКЛАДКИ "СОКЕТ" ====================
     void onConnectClicked();
     void onDisconnectClicked();
-    void onSocketConnected();
-    void onSocketDisconnected();
-    void onSocketError(QAbstractSocket::SocketError error);
-    void onSocketReadyRead();
     void onClearLogClicked();
     void onSendMessageClicked();
     void onMessageTextChanged(const QString& text);
@@ -37,16 +28,23 @@ private slots:
     void onProcessImageClicked();
     void onClearImageClicked();
 
+    // ==================== СЛОТЫ ДЛЯ ОБРАБОТКИ СИГНАЛОВ ОТ БИЗНЕС-ЛОГИКИ ====================
+    void onLogMessage(const QString& message);
+    void onConnectionStateChanged(bool connected);
+    void onImageLoaded(const QPixmap& preview, const QString& fileName);
+    void onImageProcessed();
+    void onImageCleared();
+    void onSocketError(const QString& error);
+
 private:
     Ui::MainWindow* ui;
-    QTcpSocket* tcpSocket;
 
-    // Переменные для работы с изображениями
-    QPixmap currentImage;
-    QString currentImagePath;
+    // Бизнес-логика и её поток
+    BusinessLogic* m_businessLogic;
+    QThread* m_businessThread;
 
-    // Вспомогательные методы
-    void logMessage(const QString& message);
+    // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
+    void setupConnections();
     void updateSendButtonState();
     void updateImageButtonsState();
 };
