@@ -26,6 +26,9 @@
     <QtUic Include="MainWindow.ui">
       <Filter>Form Files</Filter>
     </QtUic>
+    <QtUic Include="CropDialog.ui">
+      <Filter>Form Files</Filter>
+    </QtUic>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -40,12 +43,18 @@
     <ClCompile Include="ImageLoader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="CropDialog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="MainWindow.h">
       <Filter>Header Files</Filter>
     </QtMoc>
     <QtMoc Include="BusinessLogic.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="CropDialog.h">
       <Filter>Header Files</Filter>
     </QtMoc>
   </ItemGroup>

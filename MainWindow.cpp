@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 #include "ui_MainWindow.h"
 #include "BusinessLogic.h"
+#include "CropDialog.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QDateTime>
@@ -154,27 +155,34 @@ void MainWindow::onConnectionStateChanged(bool connected)
 
 void MainWindow::onImageLoaded(const QPixmap& originalImage, const QString& fileName)
 {
-    // 1. Получаем размеры imagePreviewLabel
-    QSize labelSize = ui->imagePreviewLabel->size();
+    // Показываем диалог кадрирования
+    CropDialog cropDialog(this);
+    cropDialog.setImage(originalImage);
 
-    // 2. Получаем размеры исходного изображения
-    QSize imageSize = originalImage.size();
+    if (cropDialog.exec() == QDialog::Accepted) {
+        // Получаем кадрированное изображение
+        QPixmap croppedImage = cropDialog.getCroppedImage();
 
-    // 3. Вычисляем масштабирование чтобы изображение вписывалось в label
-    QPixmap scaledImage = originalImage.scaled(
-        labelSize.width() - 10,    // -10 для небольших отступов
-        labelSize.height() - 10,
-        Qt::KeepAspectRatio,       // Сохраняем пропорции
-        Qt::SmoothTransformation   // Плавное масштабирование
-    );
+        // 1. Получаем размеры imagePreviewLabel
+        QSize labelSize = ui->imagePreviewLabel->size();
 
-    // 4. Устанавливаем масштабированное изображение
-    ui->imagePreviewLabel->setPixmap(scaledImage);
-    ui->imagePathLabel->setText(fileName);
+        // 2. Вычисляем масштабирование чтобы изображение вписывалось в label
+        QPixmap scaledImage = croppedImage.scaled(
+            labelSize.width() - 10,    // -10 для небольших отступов
+            labelSize.height() - 10,
+            Qt::KeepAspectRatio,       // Сохраняем пропорции
+            Qt::SmoothTransformation   // Плавное масштабирование
+        );
 
-    // Остальной код без изменений
-    updateImageButtonsState();
-    ui->tabWidget->setCurrentIndex(1);
+        // 3. Устанавливаем масштабированное изображение
+        ui->imagePreviewLabel->setPixmap(scaledImage);
+        ui->imagePathLabel->setText(fileName + " (croped)");
+
+        // Остальной код без изменений
+        updateImageButtonsState();
+        ui->tabWidget->setCurrentIndex(1);
+    }
+    // Если пользователь отменил диалог, изображение не отображается
 }
 
 void MainWindow::onImageProcessed()

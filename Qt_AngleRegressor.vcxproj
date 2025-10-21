@@ -126,8 +126,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <QtUic Include="CropDialog.ui" />
     <QtUic Include="MainWindow.ui" />
     <ClCompile Include="BusinessLogic.cpp" />
+    <ClCompile Include="CropDialog.cpp" />
     <ClCompile Include="ImageLoader.cpp" />
     <ClCompile Include="MainWindow.cpp" />
     <ClCompile Include="main.cpp" />
@@ -139,6 +141,7 @@
     <QtMoc Include="BusinessLogic.h" />
   </ItemGroup>
   <ItemGroup>
+    <QtMoc Include="CropDialog.h" />
     <ClInclude Include="ImageLoader.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
