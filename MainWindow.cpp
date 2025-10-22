@@ -15,33 +15,29 @@ MainWindow::MainWindow(QWidget* parent)
     ui->setupUi(this);
 
     // ==================== НАСТРОЙКА НАЧАЛЬНОГО СОСТОЯНИЯ ====================
-
     ui->messageLineEdit->setPlaceholderText("Enter message to send...");
 
     // ==================== НАСТРОЙКА ПОТОКА ДЛЯ БИЗНЕС-ЛОГИКИ ====================
-
-    // Перемещаем бизнес-логику в отдельный поток
+    // Перемещаем бизнес-логику в отдельный поток для предотвращения блокировки GUI
     m_businessLogic->moveToThread(m_businessThread);
-
-    // Запускаем поток
     m_businessThread->start();
 
-    // ==================== НАСТРОЙКА СОЕДИНЕНИЙ ====================
-
+    // ==================== НАСТРОЙКА СОЕДИНЕНИЙ СИГНАЛОВ И СЛОТОВ ====================
     setupConnections();
 
-    // ==================== ИНИЦИАЛИЗАЦИЯ СОСТОЯНИЯ ====================
-
+    // ==================== ИНИЦИАЛИЗАЦИЯ СОСТОЯНИЯ ИНТЕРФЕЙСА ====================
     updateSendButtonState();
     updateImageButtonsState();
 }
 
 MainWindow::~MainWindow()
 {
-    // Корректное завершение потока
+    // ==================== КОРРЕКТНОЕ ЗАВЕРШЕНИЕ ПОТОКА ====================
+    // Плавное завершение работы потока бизнес-логики
     m_businessThread->quit();
-    m_businessThread->wait(1000); // Ждем до 1 секунды для завершения
+    m_businessThread->wait(1000);
 
+    // Принудительное завершение если поток не ответил
     if (m_businessThread->isRunning()) {
         m_businessThread->terminate();
         m_businessThread->wait();
@@ -52,11 +48,9 @@ MainWindow::~MainWindow()
 }
 
 // ==================== НАСТРОЙКА СОЕДИНЕНИЙ МЕЖДУ GUI И БИЗНЕС-ЛОГИКОЙ ====================
-
 void MainWindow::setupConnections()
 {
     // ==================== СОЕДИНЕНИЯ ДЛЯ ВКЛАДКИ "СОКЕТ" ====================
-
     connect(ui->connectButton, &QPushButton::clicked, this, &MainWindow::onConnectClicked);
     connect(ui->disconnectButton, &QPushButton::clicked, this, &MainWindow::onDisconnectClicked);
     connect(ui->clearLogButton, &QPushButton::clicked, this, &MainWindow::onClearLogClicked);
@@ -64,14 +58,12 @@ void MainWindow::setupConnections()
     connect(ui->messageLineEdit, &QLineEdit::textChanged, this, &MainWindow::onMessageTextChanged);
 
     // ==================== СОЕДИНЕНИЯ ДЛЯ ВКЛАДКИ "РАЗВЁРТКА" ====================
-
     connect(ui->loadImageButton, &QPushButton::clicked, this, &MainWindow::onLoadImageClicked);
     connect(ui->processImageButton, &QPushButton::clicked, this, &MainWindow::onProcessImageClicked);
     connect(ui->clearImageButton, &QPushButton::clicked, this, &MainWindow::onClearImageClicked);
 
     // ==================== СОЕДИНЕНИЯ С БИЗНЕС-ЛОГИКОЙ ====================
-
-    // Сигналы от бизнес-логики к GUI
+    // Сигналы от бизнес-логики к GUI (межпоточные соединения)
     connect(m_businessLogic, &BusinessLogic::logMessage, this, &MainWindow::onLogMessage);
     connect(m_businessLogic, &BusinessLogic::connectionStateChanged, this, &MainWindow::onConnectionStateChanged);
     connect(m_businessLogic, &BusinessLogic::imageLoaded, this, &MainWindow::onImageLoaded);
@@ -81,7 +73,6 @@ void MainWindow::setupConnections()
 }
 
 // ==================== РЕАЛИЗАЦИЯ СЛОТОВ ДЛЯ ВКЛАДКИ "СОКЕТ" ====================
-
 void MainWindow::onConnectClicked()
 {
     QString ip = ui->ipLineEdit->text();
@@ -114,9 +105,9 @@ void MainWindow::onMessageTextChanged(const QString& text)
 }
 
 // ==================== РЕАЛИЗАЦИЯ СЛОТОВ ДЛЯ ВКЛАДКИ "РАЗВЁРТКА" ====================
-
 void MainWindow::onLoadImageClicked()
 {
+    // Диалог выбора файла с поддержкой различных форматов
     QString fileName = QFileDialog::getOpenFileName(this,
         "Select Image",
         "",
@@ -139,15 +130,16 @@ void MainWindow::onClearImageClicked()
 }
 
 // ==================== СЛОТЫ ДЛЯ ОБРАБОТКИ СИГНАЛОВ ОТ БИЗНЕС-ЛОГИКИ ====================
-
 void MainWindow::onLogMessage(const QString& message)
 {
+    // Добавление временной метки к каждому сообщению в логе
     QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss");
     ui->logTextEdit->append(QString("[%1] %2").arg(timestamp, message));
 }
 
 void MainWindow::onConnectionStateChanged(bool connected)
 {
+    // Обновление состояния кнопок подключения/отключения
     ui->connectButton->setEnabled(!connected);
     ui->disconnectButton->setEnabled(connected);
     updateSendButtonState();
@@ -155,7 +147,7 @@ void MainWindow::onConnectionStateChanged(bool connected)
 
 void MainWindow::onImageLoaded(const QPixmap& originalImage, const QString& fileName)
 {
-    // Показываем диалог кадрирования
+    // Показываем диалог кадрирования перед отображением изображения
     CropDialog cropDialog(this);
     cropDialog.setImage(originalImage);
 
@@ -163,32 +155,35 @@ void MainWindow::onImageLoaded(const QPixmap& originalImage, const QString& file
         // Получаем кадрированное изображение
         QPixmap croppedImage = cropDialog.getCroppedImage();
 
-        // 1. Получаем размеры imagePreviewLabel
+        // Масштабируем изображение для отображения в preview
         QSize labelSize = ui->imagePreviewLabel->size();
-
-        // 2. Вычисляем масштабирование чтобы изображение вписывалось в label
         QPixmap scaledImage = croppedImage.scaled(
-            labelSize.width() - 10,    // -10 для небольших отступов
+            labelSize.width() - 10,
             labelSize.height() - 10,
-            Qt::KeepAspectRatio,       // Сохраняем пропорции
-            Qt::SmoothTransformation   // Плавное масштабирование
+            Qt::KeepAspectRatio,
+            Qt::SmoothTransformation
         );
 
-        // 3. Устанавливаем масштабированное изображение
+        // Устанавливаем изображение и информацию о файле
         ui->imagePreviewLabel->setPixmap(scaledImage);
-        ui->imagePathLabel->setText(fileName + " (croped)");
 
-        // Остальной код без изменений
+        // Добавляем пометку о кадрировании если оно было применено
+        if (cropDialog.getCroppedImage().size() != originalImage.size()) {
+            ui->imagePathLabel->setText(fileName + " (cropped)");
+        }
+        else {
+            ui->imagePathLabel->setText(fileName);
+        }
+
         updateImageButtonsState();
-        ui->tabWidget->setCurrentIndex(1);
+        ui->tabWidget->setCurrentIndex(1); // Переключаемся на вкладку с изображением
     }
-    // Если пользователь отменил диалог, изображение не отображается
 }
 
 void MainWindow::onImageProcessed()
 {
     ui->processImageButton->setEnabled(true);
-    ui->tabWidget->setCurrentIndex(2);
+    ui->tabWidget->setCurrentIndex(2); // Переключаемся на вкладку "Результаты"
 }
 
 void MainWindow::onImageCleared()
@@ -201,22 +196,23 @@ void MainWindow::onImageCleared()
 
 void MainWindow::onSocketError(const QString& error)
 {
-    QMessageBox::warning(this, "Error", error);
+    QMessageBox::warning(this, "Connection Error", error);
 }
 
 // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
-
 void MainWindow::updateSendButtonState()
 {
+    // Кнопка отправки активна только при наличии текста и установленном соединении
     bool hasText = !ui->messageLineEdit->text().trimmed().isEmpty();
     bool isConnected = ui->disconnectButton->isEnabled();
-
     ui->sendMessageButton->setEnabled(hasText && isConnected);
 }
 
 void MainWindow::updateImageButtonsState()
 {
-    bool hasImage = !ui->imagePathLabel->text().isEmpty() && ui->imagePathLabel->text() != "No file selected";
+    // Кнопки обработки и очистки активны только при загруженном изображении
+    bool hasImage = !ui->imagePathLabel->text().isEmpty() &&
+        ui->imagePathLabel->text() != "No file selected";
     ui->processImageButton->setEnabled(hasImage);
     ui->clearImageButton->setEnabled(hasImage);
 }

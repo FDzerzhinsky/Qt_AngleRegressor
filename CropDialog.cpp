@@ -1,7 +1,11 @@
-#include "CropDialog.h"
+﻿#include "CropDialog.h"
 #include "ui_CropDialog.h"
 #include <QPainter>
 #include <QMouseEvent>
+#include <QResizeEvent>
+#include <QShowEvent>
+#include <QScreen>
+#include <QApplication>
 
 CropDialog::CropDialog(QWidget* parent) :
     QDialog(parent),
@@ -14,15 +18,18 @@ CropDialog::CropDialog(QWidget* parent) :
 {
     ui->setupUi(this);
 
-    // ��������� ���������� ��������� (����� ����������� ����� �������� �����������)
-    ui->topSlider->setRange(0, 0);
-    ui->bottomSlider->setRange(0, 0);
+    // Настройка окна - разрешаем разворачивание на весь экран
+    setWindowFlags(windowFlags() | Qt::WindowMaximizeButtonHint);
 
-    // ���������� ��������
-    connect(ui->topSlider, &QSlider::valueChanged, this, &CropDialog::onCropTopChanged);
-    connect(ui->bottomSlider, &QSlider::valueChanged, this, &CropDialog::onCropBottomChanged);
+    // Установка подсказки для пользователя
+    ui->instructionLabel->setText("Перетащи верхнюю и/или нижнюю линию для обрезки изображения");
+
+    // Соединения сигналов кнопок
     connect(ui->resetButton, &QPushButton::clicked, this, &CropDialog::onResetClicked);
     connect(ui->acceptButton, &QPushButton::clicked, this, &CropDialog::onAcceptClicked);
+
+    // Устанавливаем фокус на кнопку "Далее" для удобства
+    ui->acceptButton->setFocus();
 }
 
 CropDialog::~CropDialog()
@@ -33,126 +40,170 @@ CropDialog::~CropDialog()
 void CropDialog::setImage(const QPixmap& image)
 {
     m_originalImage = image;
-    m_displayImage = image;
 
-    // ��������� ���������� ��������� �� ������ �������� �����������
-    int maxCrop = m_originalImage.height() / 2; // ������������ ������� - �������� ������
-    ui->topSlider->setRange(0, maxCrop);
-    ui->bottomSlider->setRange(0, maxCrop);
-
-    // ����� �������� ������������
+    // Сброс значений кадрирования
     m_cropTop = 0;
     m_cropBottom = 0;
-    ui->topSlider->setValue(0);
-    ui->bottomSlider->setValue(0);
 
+    // Обновляем геометрию отображения и превью
+    updateImageDisplayRect();
     updatePreview();
 }
 
 QPixmap CropDialog::getCroppedImage() const
 {
+    // Если кадрирование не применялось, возвращаем оригинальное изображение
     if (m_cropTop == 0 && m_cropBottom == 0) {
-        return m_originalImage; // ���������� �������� ���� ������������ �� �����������
+        return m_originalImage;
     }
 
-    // ������� ���������� �����������
+    // Вычисляем высоту обрезанного изображения
     int cropHeight = m_originalImage.height() - m_cropTop - m_cropBottom;
+
+    // Защита от некорректных значений
     if (cropHeight <= 0) {
-        return m_originalImage; // ������ �� ������������ ��������
+        return m_originalImage;
     }
 
+    // Создаем прямоугольник кадрирования и возвращаем обрезанное изображение
     QRect cropRect(0, m_cropTop, m_originalImage.width(), cropHeight);
     return m_originalImage.copy(cropRect);
 }
 
-void CropDialog::onCropTopChanged(int value)
-{
-    m_cropTop = value;
-    updatePreview();
-}
-
-void CropDialog::onCropBottomChanged(int value)
-{
-    m_cropBottom = value;
-    updatePreview();
-}
-
 void CropDialog::onResetClicked()
 {
+    // Сброс кадрирования к исходному состоянию
     m_cropTop = 0;
     m_cropBottom = 0;
-    ui->topSlider->setValue(0);
-    ui->bottomSlider->setValue(0);
     updatePreview();
 }
 
 void CropDialog::onAcceptClicked()
 {
-    accept(); // ��������� ������ � ����������� Accepted
+    accept();
 }
 
 void CropDialog::updatePreview()
 {
-    // ��������� ����� � ����������� � ������������
-    QString info = QString("�������: ������ %1px, ����� %2px. �������� ������: %3x%4")
+    // Обновляем информационную метку с данными о кадрировании
+    QString info = QString("Кадрировано: верх %1px, низ %2px. финальный размер: %3x%4")
         .arg(m_cropTop)
         .arg(m_cropBottom)
         .arg(m_originalImage.width())
         .arg(m_originalImage.height() - m_cropTop - m_cropBottom);
     ui->infoLabel->setText(info);
 
-    // �������������� preview
     update();
 }
 
-void CropDialog::drawCropAreas()
+void CropDialog::updateImageDisplayRect()
 {
     if (m_originalImage.isNull()) return;
 
-    // �������� ���������� ����������� �����������
-    int imgY = getImageDisplayY();
-    int imgHeight = getImageDisplayHeight();
+    // Получаем размеры области preview (QLabel)
+    QSize previewSize = ui->previewLabel->size();
 
-    // ��������� ������� ����� ������������ � ����������� �����������
-    int topLine = imgY + imageToDisplayY(m_cropTop);
-    int bottomLine = imgY + imageToDisplayY(m_originalImage.height() - m_cropBottom);
+    // Вычисляем максимальный размер для отображения с сохранением пропорций
+    int maxWidth = previewSize.width() - 20;  // Отступы по бокам
+    int maxHeight = previewSize.height() - 60; // Увеличиваем отступы сверху и снизу для текста
 
-    QPainter painter(this);
+    // Масштабируем изображение с сохранением пропорций
+    m_displayImage = m_originalImage.scaled(
+        maxWidth,
+        maxHeight,
+        Qt::KeepAspectRatio,
+        Qt::SmoothTransformation
+    );
 
-    // ������ ����������� ������� ������ � �����
-    QColor darkArea(0, 0, 0, 128); // �������������� ������
+    // Вычисляем прямоугольник для отображения изображения (центрированный в previewLabel)
+    int x = (previewSize.width() - m_displayImage.width()) / 2;
+    int y = (previewSize.height() - m_displayImage.height()) / 2;
 
-    // ������� ������� ������������
+    // Получаем глобальную позицию previewLabel и вычисляем прямоугольник отображения
+    QPoint previewPos = ui->previewLabel->pos();
+    m_imageDisplayRect = QRect(previewPos.x() + x, previewPos.y() + y,
+        m_displayImage.width(), m_displayImage.height());
+}
+
+void CropDialog::drawCropAreas(QPainter& painter)
+{
+    if (m_originalImage.isNull() || m_displayImage.isNull()) return;
+
+    // Вычисляем позиции линий кадрирования в координатах отображения
+    int topLine = m_imageDisplayRect.top() + imageToDisplayY(m_cropTop);
+    int bottomLine = m_imageDisplayRect.top() + imageToDisplayY(m_originalImage.height() - m_cropBottom);
+
+    // Рисуем затемненные области кадрирования
+    QColor darkArea(0, 0, 0, 150);
+
+    // Верхняя область кадрирования
     if (m_cropTop > 0) {
-        painter.fillRect(0, imgY, width(), topLine - imgY, darkArea);
+        QRect topCropRect(m_imageDisplayRect.left(), m_imageDisplayRect.top(),
+            m_imageDisplayRect.width(), topLine - m_imageDisplayRect.top());
+        painter.fillRect(topCropRect, darkArea);
     }
 
-    // ������ ������� ������������
+    // Нижняя область кадрирования
     if (m_cropBottom > 0) {
-        painter.fillRect(0, bottomLine, width(), imgY + imgHeight - bottomLine, darkArea);
+        QRect bottomCropRect(m_imageDisplayRect.left(), bottomLine,
+            m_imageDisplayRect.width(), m_imageDisplayRect.bottom() - bottomLine);
+        painter.fillRect(bottomCropRect, darkArea);
     }
 
-    // ������ ����� ������������
-    QPen linePen(Qt::red, 2);
+    // Настройка пера для линий кадрирования
+    QPen linePen(QColor(255, 50, 50), 3);
     painter.setPen(linePen);
 
-    // ������� �����
+    // Рисуем верхнюю линию кадрирования
     if (m_cropTop > 0) {
-        painter.drawLine(0, topLine, width(), topLine);
+        painter.drawLine(m_imageDisplayRect.left(), topLine, m_imageDisplayRect.right(), topLine);
+
+        // Добавляем индикатор размера обрезки сверху
+        painter.setPen(Qt::white);
+        painter.drawText(m_imageDisplayRect.left() + 10, topLine - 8, QString("↑ %1px").arg(m_cropTop));
+        painter.setPen(linePen);
     }
 
-    // ������ �����
+    // Рисуем нижнюю линию кадрирования
     if (m_cropBottom > 0) {
-        painter.drawLine(0, bottomLine, width(), bottomLine);
+        painter.drawLine(m_imageDisplayRect.left(), bottomLine, m_imageDisplayRect.right(), bottomLine);
+
+        // Добавляем индикатор размера обрезки снизу
+        painter.setPen(Qt::white);
+        painter.drawText(m_imageDisplayRect.left() + 10, bottomLine + 18, QString("↓ %1px").arg(m_cropBottom));
     }
 
-    // ������� �����
-    painter.setPen(Qt::white);
-    if (m_cropTop > 0) {
-        painter.drawText(10, topLine - 5, QString("������: %1px").arg(m_cropTop));
+    // Рисуем подсказочные линии независимо для верхнего и нижнего края
+    QPen hintPen(QColor(100, 100, 255), 2, Qt::DashLine);
+
+    // Получаем геометрию previewLabel для ограничения области рисования текста
+    QRect previewRect = ui->previewLabel->geometry();
+    int textVerticalOffset = 25; // Отступ для текста от границ изображения
+
+    // Верхняя подсказочная линия (только если не сдвинута)
+    if (m_cropTop == 0) {
+        painter.setPen(hintPen);
+        painter.drawLine(m_imageDisplayRect.left(), m_imageDisplayRect.top(),
+            m_imageDisplayRect.right(), m_imageDisplayRect.top());
+
+        // Текст подсказки для верхней линии - внутри previewLabel
+        painter.setPen(Qt::white);
+        QRect textRect(previewRect.left() + 10, previewRect.top() - 4,
+            previewRect.width() - 20, 30);
+        painter.drawText(textRect, Qt::AlignCenter, "Перетащи для обрезки сверху");
     }
-    if (m_cropBottom > 0) {
-        painter.drawText(10, bottomLine + 15, QString("�����: %1px").arg(m_cropBottom));
+
+    // Нижняя подсказочная линия (только если не сдвинута)
+    if (m_cropBottom == 0) {
+        painter.setPen(hintPen);
+        painter.drawLine(m_imageDisplayRect.left(), m_imageDisplayRect.bottom(),
+            m_imageDisplayRect.right(), m_imageDisplayRect.bottom());
+
+        // Текст подсказки для нижней линии - внутри previewLabel
+        painter.setPen(Qt::white);
+        QRect textRect(previewRect.left() + 10, previewRect.bottom() - 35,
+            previewRect.width() - 20, 30);
+        painter.drawText(textRect, Qt::AlignCenter, "Перетащи для обрезки снизу");
     }
 }
 
@@ -164,27 +215,42 @@ void CropDialog::paintEvent(QPaintEvent* event)
 
     QPainter painter(this);
 
-    // ��������� ������� ��� ����������� ����������� � ����������� ���������
-    QSize labelSize = ui->previewLabel->size();
-    QPixmap scaledImage = m_originalImage.scaled(
-        labelSize.width() - 4,    // -4 ��� ��������
-        labelSize.height() - 4,
-        Qt::KeepAspectRatio,
-        Qt::SmoothTransformation
-    );
+    // Рисуем рамку вокруг области preview
+    QRect previewFrame = ui->previewLabel->geometry();
+    painter.setPen(QPen(Qt::darkGray, 2));
+    painter.drawRect(previewFrame);
 
-    // ���������� ����������� � label
-    int x = (labelSize.width() - scaledImage.width()) / 2;
-    int y = (labelSize.height() - scaledImage.height()) / 2;
+    // Рисуем масштабированное изображение в вычисленном прямоугольнике
+    painter.drawPixmap(m_imageDisplayRect, m_displayImage);
 
-    // ��������� ��������� ����������� ��� ��������� ����
-    m_displayImage = scaledImage;
+    // Рисуем области и линии кадрирования поверх изображения
+    drawCropAreas(painter);
+}
 
-    // ������ �����������
-    painter.drawPixmap(x, y, scaledImage);
+void CropDialog::resizeEvent(QResizeEvent* event)
+{
+    QDialog::resizeEvent(event);
+    updateImageDisplayRect();
+    updatePreview();
+}
 
-    // ������ ������� ������������
-    drawCropAreas();
+void CropDialog::showEvent(QShowEvent* event)
+{
+    QDialog::showEvent(event);
+
+    // При показе окна устанавливаем оптимальный размер
+    QScreen* screen = QGuiApplication::primaryScreen();
+    QRect screenGeometry = screen->availableGeometry();
+
+    // Устанавливаем начальный размер окна (80% от экрана)
+    QSize initialSize = screenGeometry.size() * 0.8;
+    resize(initialSize);
+
+    // Центрируем окно на экране
+    move(screenGeometry.center() - rect().center());
+
+    updateImageDisplayRect();
+    updatePreview();
 }
 
 void CropDialog::mousePressEvent(QMouseEvent* event)
@@ -194,23 +260,34 @@ void CropDialog::mousePressEvent(QMouseEvent* event)
         return;
     }
 
-    int imgY = getImageDisplayY();
-    int imgHeight = getImageDisplayHeight();
-    int mouseY = event->pos().y();
+    QPoint mousePos = event->pos();
 
-    // ���������, ������ �� ���� � ������ ������������
-    int topLine = imgY + imageToDisplayY(m_cropTop);
-    int bottomLine = imgY + imageToDisplayY(m_originalImage.height() - m_cropBottom);
+    // Проверяем, находится ли мышь в области отображения изображения
+    if (!m_imageDisplayRect.contains(mousePos)) {
+        QDialog::mousePressEvent(event);
+        return;
+    }
 
-    const int grabMargin = 10; // ������ ������� �����
+    int mouseY = mousePos.y();
 
+    // Вычисляем позиции линий кадрирования
+    int topLine = m_imageDisplayRect.top() + imageToDisplayY(m_cropTop);
+    int bottomLine = m_imageDisplayRect.top() + imageToDisplayY(m_originalImage.height() - m_cropBottom);
+
+    const int grabMargin = 25; // Увеличенный радиус захвата линии
+
+    // Проверяем близость к верхней линии кадрирования
     if (abs(mouseY - topLine) <= grabMargin) {
         m_draggingTop = true;
         m_dragStartY = mouseY;
+        return;
     }
-    else if (abs(mouseY - bottomLine) <= grabMargin) {
+
+    // Проверяем близость к нижней линии кадрирования
+    if (abs(mouseY - bottomLine) <= grabMargin) {
         m_draggingBottom = true;
         m_dragStartY = mouseY;
+        return;
     }
 
     QDialog::mousePressEvent(event);
@@ -223,21 +300,15 @@ void CropDialog::mouseMoveEvent(QMouseEvent* event)
         int deltaY = mouseY - m_dragStartY;
 
         if (deltaY != 0) {
-            int imgHeight = getImageDisplayHeight();
-            int originalHeight = m_originalImage.height();
-
-            // ����������� �������� � ���������� �����������
-            int deltaImageY = (deltaY * originalHeight) / imgHeight;
+            int deltaImageY = displayToImageY(deltaY);
 
             if (m_draggingTop) {
-                int newTop = qMax(0, qMin(m_cropTop + deltaImageY, originalHeight - m_cropBottom - 1));
+                int newTop = qMax(0, qMin(m_cropTop + deltaImageY, m_originalImage.height() - m_cropBottom - 10));
                 m_cropTop = newTop;
-                ui->topSlider->setValue(newTop);
             }
             else if (m_draggingBottom) {
-                int newBottom = qMax(0, qMin(m_cropBottom - deltaImageY, originalHeight - m_cropTop - 1));
+                int newBottom = qMax(0, qMin(m_cropBottom - deltaImageY, m_originalImage.height() - m_cropTop - 10));
                 m_cropBottom = newBottom;
-                ui->bottomSlider->setValue(newBottom);
             }
 
             m_dragStartY = mouseY;
@@ -255,26 +326,14 @@ void CropDialog::mouseReleaseEvent(QMouseEvent* event)
     QDialog::mouseReleaseEvent(event);
 }
 
-int CropDialog::getImageDisplayY() const
-{
-    QSize labelSize = ui->previewLabel->size();
-    int displayHeight = m_displayImage.height();
-    return (labelSize.height() - displayHeight) / 2;
-}
-
-int CropDialog::getImageDisplayHeight() const
-{
-    return m_displayImage.height();
-}
-
 int CropDialog::displayToImageY(int displayY) const
 {
-    if (m_displayImage.isNull()) return 0;
-    return (displayY * m_originalImage.height()) / m_displayImage.height();
+    if (m_displayImage.isNull() || m_imageDisplayRect.height() == 0) return 0;
+    return (displayY * m_originalImage.height()) / m_imageDisplayRect.height();
 }
 
 int CropDialog::imageToDisplayY(int imageY) const
 {
-    if (m_originalImage.isNull()) return 0;
-    return (imageY * m_displayImage.height()) / m_originalImage.height();
+    if (m_originalImage.isNull() || m_originalImage.height() == 0) return 0;
+    return (imageY * m_imageDisplayRect.height()) / m_originalImage.height();
 }

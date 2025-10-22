@@ -1,251 +1,289 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>MainWindow</class>
- <widget class="QMainWindow" name="MainWindow">
-  <property name="geometry">
-   <rect>
-    <x>0</x>
-    <y>0</y>
-    <width>800</width>
-    <height>600</height>
-   </rect>
-  </property>
-  <property name="windowTitle">
-   <string>Vision System GUI</string>
-  </property>
-  <widget class="QWidget" name="centralWidget">
-   <layout class="QVBoxLayout" name="mainVerticalLayout">
-    <item>
-     <widget class="QTabWidget" name="tabWidget">
-      <property name="currentIndex">
-       <number>0</number>
-      </property>
-      <widget class="QWidget" name="socketTab">
-       <attribute name="title">
-        <string>Сокет</string>
-       </attribute>
-       <layout class="QVBoxLayout" name="socketTabLayout">
-        <item>
-         <widget class="QGroupBox" name="connectionGroupBox">
-          <property name="title">
-           <string>Connection Settings</string>
-          </property>
-          <layout class="QHBoxLayout" name="connectionLayout">
-           <item>
-            <widget class="QLabel" name="ipLabel">
-             <property name="text">
-              <string>IP Address:</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QLineEdit" name="ipLineEdit">
-             <property name="text">
-              <string>127.0.0.1</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QLabel" name="portLabel">
-             <property name="text">
-              <string>Port:</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QSpinBox" name="portSpinBox">
-             <property name="minimum">
-              <number>1</number>
-             </property>
-             <property name="maximum">
-              <number>65535</number>
-             </property>
-             <property name="value">
-              <number>12345</number>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QPushButton" name="connectButton">
-             <property name="text">
-              <string>Connect</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QPushButton" name="disconnectButton">
-             <property name="enabled">
-              <bool>false</bool>
-             </property>
-             <property name="text">
-              <string>Disconnect</string>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </widget>
-        </item>
-        <item>
-         <widget class="QGroupBox" name="logGroupBox">
-          <property name="title">
-           <string>Log Messages</string>
-          </property>
-          <layout class="QVBoxLayout" name="logLayout">
-           <item>
-            <layout class="QHBoxLayout" name="logControlsLayout">
-             <item>
-              <widget class="QPushButton" name="clearLogButton">
-               <property name="text">
-                <string>Clear Log</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <spacer name="logSpacer">
-               <property name="orientation">
-                <enum>Qt::Orientation::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>40</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-             <item>
-              <widget class="QPushButton" name="sendMessageButton">
-               <property name="text">
-                <string>Send</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QLineEdit" name="messageLineEdit"/>
-             </item>
-            </layout>
-           </item>
-           <item>
-            <widget class="QTextEdit" name="logTextEdit">
-             <property name="readOnly">
-              <bool>true</bool>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </widget>
-        </item>
-       </layout>
-      </widget>
-      <widget class="QWidget" name="imageTab">
-       <attribute name="title">
-        <string>Развёртка</string>
-       </attribute>
-       <layout class="QVBoxLayout" name="imageTabLayout">
-        <item>
-         <widget class="QGroupBox" name="imageGroupBox">
-          <property name="title">
-           <string>Загрузка и обработка изображения</string>
-          </property>
-          <layout class="QVBoxLayout" name="imageGroupLayout">
-           <item>
-            <layout class="QHBoxLayout" name="imageControlsLayout">
-             <item>
-              <widget class="QPushButton" name="loadImageButton">
-               <property name="text">
-                <string>Загрузить изображение</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QLabel" name="imagePathLabel">
-               <property name="text">
-                <string>Файл не выбран</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </item>
-           <item>
-            <widget class="QLabel" name="imagePreviewLabel">
-             <property name="minimumSize">
-              <size>
-               <width>400</width>
-               <height>300</height>
-              </size>
-             </property>
-             <property name="frameShape">
-              <enum>QFrame::Shape::Box</enum>
-             </property>
-             <property name="text">
-              <string>Развёртка банки</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignmentFlag::AlignCenter</set>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <layout class="QHBoxLayout" name="imageActionsLayout">
-             <item>
-              <widget class="QPushButton" name="processImageButton">
-               <property name="enabled">
-                <bool>false</bool>
-               </property>
-               <property name="text">
-                <string>Обработать</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <spacer name="imageActionsSpacer">
-               <property name="orientation">
-                <enum>Qt::Orientation::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>40</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-             <item>
-              <widget class="QPushButton" name="clearImageButton">
-               <property name="text">
-                <string>Очистить</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </item>
-          </layout>
-         </widget>
-        </item>
-       </layout>
-      </widget>
-      <widget class="QWidget" name="resultsTab">
-       <attribute name="title">
-        <string>Результаты</string>
-       </attribute>
-       <layout class="QVBoxLayout" name="resultsTabLayout">
-        <item>
-         <widget class="QLabel" name="resultsLabel">
-          <property name="text">
-           <string>Здесь будут отображаться результаты обработки</string>
-          </property>
-          <property name="alignment">
-           <set>Qt::AlignmentFlag::AlignCenter</set>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </widget>
-     </widget>
-    </item>
-   </layout>
-  </widget>
- </widget>
- <resources/>
- <connections/>
+	<class>MainWindow</class>
+	<widget class="QMainWindow" name="MainWindow">
+		<property name="geometry">
+			<rect>
+				<x>0</x>
+				<y>0</y>
+				<width>800</width>
+				<height>600</height>
+			</rect>
+		</property>
+		<property name="windowTitle">
+			<string>Vision System GUI</string>
+		</property>
+		<widget class="QWidget" name="centralWidget">
+			<layout class="QVBoxLayout" name="mainVerticalLayout">
+				<item>
+					<widget class="QTabWidget" name="tabWidget">
+						<property name="currentIndex">
+							<number>0</number>
+						</property>
+
+						<!-- ВКЛАДКА "СОКЕТ" -->
+						<widget class="QWidget" name="socketTab">
+							<attribute name="title">
+								<string>Сокет</string>
+							</attribute>
+							<layout class="QVBoxLayout" name="socketTabLayout">
+								<item>
+									<widget class="QGroupBox" name="connectionGroupBox">
+										<property name="title">
+											<string>Настройки подключения</string>
+										</property>
+										<layout class="QHBoxLayout" name="connectionLayout">
+											<item>
+												<widget class="QLabel" name="ipLabel">
+													<property name="text">
+														<string>IP Адрес:</string>
+													</property>
+												</widget>
+											</item>
+											<item>
+												<widget class="QLineEdit" name="ipLineEdit">
+													<property name="text">
+														<string>127.0.0.1</string>
+													</property>
+												</widget>
+											</item>
+											<item>
+												<widget class="QLabel" name="portLabel">
+													<property name="text">
+														<string>Порт:</string>
+													</property>
+												</widget>
+											</item>
+											<item>
+												<widget class="QSpinBox" name="portSpinBox">
+													<property name="minimum">
+														<number>1</number>
+													</property>
+													<property name="maximum">
+														<number>65535</number>
+													</property>
+													<property name="value">
+														<number>12345</number>
+													</property>
+												</widget>
+											</item>
+											<item>
+												<widget class="QPushButton" name="connectButton">
+													<property name="text">
+														<string>Подключиться</string>
+													</property>
+												</widget>
+											</item>
+											<item>
+												<widget class="QPushButton" name="disconnectButton">
+													<property name="enabled">
+														<bool>false</bool>
+													</property>
+													<property name="text">
+														<string>Отключиться</string>
+													</property>
+												</widget>
+											</item>
+										</layout>
+									</widget>
+								</item>
+								<item>
+									<widget class="QGroupBox" name="logGroupBox">
+										<property name="title">
+											<string>Лог сообщений</string>
+										</property>
+										<layout class="QVBoxLayout" name="logLayout">
+											<item>
+												<layout class="QHBoxLayout" name="logControlsLayout">
+													<item>
+														<widget class="QPushButton" name="clearLogButton">
+															<property name="text">
+																<string>Очистить лог</string>
+															</property>
+														</widget>
+													</item>
+													<item>
+														<spacer name="logSpacer">
+															<property name="orientation">
+																<enum>Qt::Orientation::Horizontal</enum>
+															</property>
+															<property name="sizeHint" stdset="0">
+																<size>
+																	<width>40</width>
+																	<height>20</height>
+																</size>
+															</property>
+														</spacer>
+													</item>
+													<item>
+														<widget class="QPushButton" name="sendMessageButton">
+															<property name="text">
+																<string>Отправить</string>
+															</property>
+														</widget>
+													</item>
+													<item>
+														<widget class="QLineEdit" name="messageLineEdit"/>
+													</item>
+												</layout>
+											</item>
+											<item>
+												<widget class="QTextEdit" name="logTextEdit">
+													<property name="readOnly">
+														<bool>true</bool>
+													</property>
+												</widget>
+											</item>
+										</layout>
+									</widget>
+								</item>
+							</layout>
+						</widget>
+
+						<!-- ВКЛАДКА "РАЗВЁРТКА" - ИСПРАВЛЕННАЯ СТРУКТУРА -->
+						<widget class="QWidget" name="imageTab">
+							<attribute name="title">
+								<string>Развёртка</string>
+							</attribute>
+							<layout class="QVBoxLayout" name="imageTabLayout">
+								<!-- Группа загрузки изображения - ЗАНИМАЕТ МИНИМАЛЬНУЮ ВЫСОТУ -->
+								<item>
+									<widget class="QGroupBox" name="loadGroupBox">
+										<property name="title">
+											<string>Загрузка изображения</string>
+										</property>
+										<property name="sizePolicy">
+											<sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+												<horstretch>0</horstretch>
+												<verstretch>0</verstretch>
+											</sizepolicy>
+										</property>
+										<property name="maximumSize">
+											<size>
+												<width>16777215</width>
+												<height>80</height>
+											</size>
+										</property>
+										<layout class="QHBoxLayout" name="loadLayout">
+											<item>
+												<widget class="QPushButton" name="loadImageButton">
+													<property name="text">
+														<string>Загрузить изображение</string>
+													</property>
+												</widget>
+											</item>
+											<item>
+												<widget class="QLabel" name="imagePathLabel">
+													<property name="text">
+														<string>Файл не выбран</string>
+													</property>
+												</widget>
+											</item>
+										</layout>
+									</widget>
+								</item>
+
+								<!-- Группа превью изображения - РАСТЯГИВАЕТСЯ НА ВСЁ ОСТАВШЕЕСЯ ПРОСТРАНСТВО -->
+								<item>
+									<widget class="QGroupBox" name="previewGroupBox">
+										<property name="title">
+											<string>Превью изображения</string>
+										</property>
+										<property name="sizePolicy">
+											<sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+												<horstretch>0</horstretch>
+												<verstretch>1</verstretch>
+											</sizepolicy>
+										</property>
+										<layout class="QVBoxLayout" name="previewLayout">
+											<item>
+												<widget class="QLabel" name="imagePreviewLabel">
+													<property name="sizePolicy">
+														<sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+															<horstretch>0</horstretch>
+															<verstretch>1</verstretch>
+														</sizepolicy>
+													</property>
+													<property name="minimumSize">
+														<size>
+															<width>400</width>
+															<height>300</height>
+														</size>
+													</property>
+													<property name="frameShape">
+														<enum>QFrame::Shape::Box</enum>
+													</property>
+													<property name="text">
+														<string>Развёртка банки</string>
+													</property>
+													<property name="alignment">
+														<set>Qt::AlignmentFlag::AlignCenter</set>
+													</property>
+												</widget>
+											</item>
+											<item>
+												<layout class="QHBoxLayout" name="imageActionsLayout">
+													<item>
+														<widget class="QPushButton" name="processImageButton">
+															<property name="enabled">
+																<bool>false</bool>
+															</property>
+															<property name="text">
+																<string>Обработать</string>
+															</property>
+														</widget>
+													</item>
+													<item>
+														<spacer name="imageActionsSpacer">
+															<property name="orientation">
+																<enum>Qt::Orientation::Horizontal</enum>
+															</property>
+															<property name="sizeHint" stdset="0">
+																<size>
+																	<width>40</width>
+																	<height>20</height>
+																</size>
+															</property>
+														</spacer>
+													</item>
+													<item>
+														<widget class="QPushButton" name="clearImageButton">
+															<property name="text">
+																<string>Очистить</string>
+															</property>
+														</widget>
+													</item>
+												</layout>
+											</item>
+										</layout>
+									</widget>
+								</item>
+							</layout>
+						</widget>
+
+						<!-- ВКЛАДКА "РЕЗУЛЬТАТЫ" -->
+						<widget class="QWidget" name="resultsTab">
+							<attribute name="title">
+								<string>Результаты</string>
+							</attribute>
+							<layout class="QVBoxLayout" name="resultsTabLayout">
+								<item>
+									<widget class="QLabel" name="resultsLabel">
+										<property name="text">
+											<string>Здесь будут отображаться результаты обработки</string>
+										</property>
+										<property name="alignment">
+											<set>Qt::AlignmentFlag::AlignCenter</set>
+										</property>
+									</widget>
+								</item>
+							</layout>
+						</widget>
+					</widget>
+				</item>
+			</layout>
+		</widget>
+	</widget>
+	<resources/>
+	<connections/>
 </ui>
