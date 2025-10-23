@@ -49,6 +49,8 @@ private:
     bool m_draggingTop;
     bool m_draggingBottom;
     int m_dragStartY;
+    int m_initialCropTop;     // Начальное значение кадрирования сверху при начале перетаскивания
+    int m_initialCropBottom;  // Начальное значение кадрирования снизу при начале перетаскивания
 
     // Геометрия отображения
     QRect m_imageDisplayRect;     // Прямоугольник отображения изображения на экране

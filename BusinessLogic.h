@@ -5,6 +5,7 @@
 #include <QPixmap>
 #include <QTimer>
 #include <QPdfDocument>
+#include <QDir>
 
 #include "ImageLoader.h"
 
@@ -24,7 +25,7 @@ public slots:
 
     // ==================== напюанрйю хгнапюфемхи ====================
     void loadImage(const QString& filePath);
-    void processImage();
+    void processImage(const QPixmap& croppedImage, const QString& fileName);
     void clearImage();
 
 signals:
@@ -42,7 +43,6 @@ private slots:
     void onSocketDisconnected();
     void onSocketError(QAbstractSocket::SocketError error);
     void onSocketReadyRead();
-    void onProcessingFinished();
 
 private:
     // ==================== оепелеммше ====================
@@ -52,4 +52,5 @@ private:
 
     // ==================== бяонлнцюрекэмше лерндш ====================
     void setupSocketConnections();
+    QString getNextAvailableFilename();
 };

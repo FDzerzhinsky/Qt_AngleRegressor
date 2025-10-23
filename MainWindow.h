@@ -5,6 +5,7 @@
 
 // Предварительное объявление классов
 class BusinessLogic;
+class CropDialog;
 namespace Ui { class MainWindow; }
 
 class MainWindow : public QMainWindow
@@ -35,7 +36,7 @@ private slots:
     void onImageProcessed();
     void onImageCleared();
     void onSocketError(const QString& error);
-
+    
 private:
     Ui::MainWindow* ui;
 
@@ -43,8 +44,15 @@ private:
     BusinessLogic* m_businessLogic;
     QThread* m_businessThread;
 
+    // Диалог кадрирования и данные изображения
+    CropDialog* m_cropDialog;
+    QPixmap m_currentImage;
+    QPixmap m_croppedImage;
+
     // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
     void setupConnections();
     void updateSendButtonState();
     void updateImageButtonsState();
+    QString getNextAvailableFilename();
+    void updateNetNameEdit();
 };

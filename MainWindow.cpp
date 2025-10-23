@@ -5,12 +5,14 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QDateTime>
+#include <QDir>
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , m_businessLogic(new BusinessLogic)
     , m_businessThread(new QThread(this))
+    , m_cropDialog(new CropDialog(this))
 {
     ui->setupUi(this);
 
@@ -120,13 +122,24 @@ void MainWindow::onLoadImageClicked()
 
 void MainWindow::onProcessImageClicked()
 {
-    ui->processImageButton->setEnabled(false);
-    m_businessLogic->processImage();
+    if (!m_croppedImage.isNull()) {
+        ui->processImageButton->setEnabled(false);
+
+        QString filename = ui->netnamelineEdit->text().trimmed();
+
+        // Передаем обрезанное изображение и имя файла в бизнес-логику для сохранения
+        m_businessLogic->processImage(m_croppedImage, filename);
+    }
+    else {
+        QMessageBox::warning(this, "Предупреждение", "Сначала загрузите и обрежьте изображение");
+    }
 }
 
 void MainWindow::onClearImageClicked()
 {
     m_businessLogic->clearImage();
+    m_currentImage = QPixmap();
+    m_croppedImage = QPixmap();
 }
 
 // ==================== СЛОТЫ ДЛЯ ОБРАБОТКИ СИГНАЛОВ ОТ БИЗНЕС-ЛОГИКИ ====================
@@ -147,17 +160,18 @@ void MainWindow::onConnectionStateChanged(bool connected)
 
 void MainWindow::onImageLoaded(const QPixmap& originalImage, const QString& fileName)
 {
-    // Показываем диалог кадрирования перед отображением изображения
-    CropDialog cropDialog(this);
-    cropDialog.setImage(originalImage);
+    m_currentImage = originalImage;
 
-    if (cropDialog.exec() == QDialog::Accepted) {
+    // Показываем диалог кадрирования перед отображением изображения
+    m_cropDialog->setImage(originalImage);
+
+    if (m_cropDialog->exec() == QDialog::Accepted) {
         // Получаем кадрированное изображение
-        QPixmap croppedImage = cropDialog.getCroppedImage();
+        m_croppedImage = m_cropDialog->getCroppedImage();
 
         // Масштабируем изображение для отображения в preview
         QSize labelSize = ui->imagePreviewLabel->size();
-        QPixmap scaledImage = croppedImage.scaled(
+        QPixmap scaledImage = m_croppedImage.scaled(
             labelSize.width() - 10,
             labelSize.height() - 10,
             Qt::KeepAspectRatio,
@@ -168,12 +182,15 @@ void MainWindow::onImageLoaded(const QPixmap& originalImage, const QString& file
         ui->imagePreviewLabel->setPixmap(scaledImage);
 
         // Добавляем пометку о кадрировании если оно было применено
-        if (cropDialog.getCroppedImage().size() != originalImage.size()) {
+        if (m_cropDialog->getCroppedImage().size() != originalImage.size()) {
             ui->imagePathLabel->setText(fileName + " (cropped)");
         }
         else {
             ui->imagePathLabel->setText(fileName);
         }
+
+        // Обновляем поле имени файла с автоматически сгенерированным именем
+        updateNetNameEdit();
 
         updateImageButtonsState();
         ui->tabWidget->setCurrentIndex(1); // Переключаемся на вкладку с изображением
@@ -191,6 +208,7 @@ void MainWindow::onImageCleared()
     ui->imagePreviewLabel->clear();
     ui->imagePreviewLabel->setText("Image Preview");
     ui->imagePathLabel->setText("No file selected");
+    ui->netnamelineEdit->clear();
     updateImageButtonsState();
 }
 
@@ -215,4 +233,28 @@ void MainWindow::updateImageButtonsState()
         ui->imagePathLabel->text() != "No file selected";
     ui->processImageButton->setEnabled(hasImage);
     ui->clearImageButton->setEnabled(hasImage);
+}
+
+QString MainWindow::getNextAvailableFilename()
+{
+    QDir netsurfacesDir("netsurfaces");
+
+    // Create directory if it doesn't exist
+    if (!netsurfacesDir.exists()) {
+        netsurfacesDir.mkpath(".");
+    }
+
+    // Find the next available number
+    int nextNumber = 1;
+    while (netsurfacesDir.exists(QString("netsurface%1.png").arg(nextNumber))) {
+        nextNumber++;
+    }
+
+    return QString("netsurface%1.png").arg(nextNumber);
+}
+
+void MainWindow::updateNetNameEdit()
+{
+    QString nextFilename = getNextAvailableFilename();
+    ui->netnamelineEdit->setText(nextFilename);
 }

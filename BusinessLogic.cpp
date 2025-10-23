@@ -1,5 +1,6 @@
 #include "BusinessLogic.h"
 #include <QFileInfo>
+#include <QDir>
 
 BusinessLogic::BusinessLogic(QObject* parent)
     : QObject(parent)
@@ -76,13 +77,35 @@ void BusinessLogic::loadImage(const QString& filePath)
     }
 }
 
-void BusinessLogic::processImage()
+void BusinessLogic::processImage(const QPixmap& croppedImage, const QString& fileName)
 {
-    if (!m_currentImage.isNull()) {
-        emit logMessage("Started image processing: " + m_currentImagePath);
+    if (croppedImage.isNull()) {
+        emit logMessage("Error: No cropped image to process");
+        return;
+    }
 
-        // Имитация длительной обработки в отдельном потоке
-        QTimer::singleShot(2000, this, &BusinessLogic::onProcessingFinished);
+    QString finalFileName = fileName;
+
+    // Ensure filename has .png extension
+    if (!finalFileName.toLower().endsWith(".png")) {
+        finalFileName += ".png";
+    }
+
+    // Create netsurfaces directory if it doesn't exist
+    QDir netsurfacesDir("netsurfaces");
+    if (!netsurfacesDir.exists()) {
+        netsurfacesDir.mkpath(".");
+    }
+
+    QString filePath = netsurfacesDir.filePath(finalFileName);
+
+    // Save the cropped image
+    if (croppedImage.save(filePath, "PNG")) {
+        emit logMessage(QString("Image saved as: %1").arg(finalFileName));
+        emit imageProcessed();
+    }
+    else {
+        emit logMessage(QString("Failed to save image: %1").arg(finalFileName));
     }
 }
 
@@ -125,8 +148,20 @@ void BusinessLogic::onSocketReadyRead()
 
 // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
 
-void BusinessLogic::onProcessingFinished()
+QString BusinessLogic::getNextAvailableFilename()
 {
-    emit logMessage("Image processing completed");
-    emit imageProcessed();
+    QDir netsurfacesDir("netsurfaces");
+
+    // Create directory if it doesn't exist
+    if (!netsurfacesDir.exists()) {
+        netsurfacesDir.mkpath(".");
+    }
+
+    // Find the next available number
+    int nextNumber = 1;
+    while (netsurfacesDir.exists(QString("netsurface%1.png").arg(nextNumber))) {
+        nextNumber++;
+    }
+
+    return QString("netsurface%1.png").arg(nextNumber);
 }

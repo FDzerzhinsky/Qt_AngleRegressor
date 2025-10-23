@@ -7,14 +7,16 @@
 #include <QScreen>
 #include <QApplication>
 
-CropDialog::CropDialog(QWidget* parent) :
+CropDialog::CropDialog(QWidget * parent) :
     QDialog(parent),
     ui(new Ui::CropDialog),
     m_cropTop(0),
     m_cropBottom(0),
     m_draggingTop(false),
     m_draggingBottom(false),
-    m_dragStartY(0)
+    m_dragStartY(0),
+    m_initialCropTop(0),
+    m_initialCropBottom(0)
 {
     ui->setupUi(this);
 
@@ -188,7 +190,7 @@ void CropDialog::drawCropAreas(QPainter& painter)
 
         // Текст подсказки для верхней линии - внутри previewLabel
         painter.setPen(Qt::white);
-        QRect textRect(previewRect.left() + 10, previewRect.top() - 4,
+        QRect textRect(previewRect.left() + 10, previewRect.top() + 10,
             previewRect.width() - 20, 30);
         painter.drawText(textRect, Qt::AlignCenter, "Перетащи для обрезки сверху");
     }
@@ -280,6 +282,7 @@ void CropDialog::mousePressEvent(QMouseEvent* event)
     if (abs(mouseY - topLine) <= grabMargin) {
         m_draggingTop = true;
         m_dragStartY = mouseY;
+        m_initialCropTop = m_cropTop; // Сохраняем начальное значение
         return;
     }
 
@@ -287,6 +290,7 @@ void CropDialog::mousePressEvent(QMouseEvent* event)
     if (abs(mouseY - bottomLine) <= grabMargin) {
         m_draggingBottom = true;
         m_dragStartY = mouseY;
+        m_initialCropBottom = m_cropBottom; // Сохраняем начальное значение
         return;
     }
 
@@ -299,21 +303,25 @@ void CropDialog::mouseMoveEvent(QMouseEvent* event)
         int mouseY = event->pos().y();
         int deltaY = mouseY - m_dragStartY;
 
-        if (deltaY != 0) {
-            int deltaImageY = displayToImageY(deltaY);
+        // Преобразуем изменение координат мыши в координаты исходного изображения
+        int deltaImageY = displayToImageY(deltaY);
 
-            if (m_draggingTop) {
-                int newTop = qMax(0, qMin(m_cropTop + deltaImageY, m_originalImage.height() - m_cropBottom - 10));
-                m_cropTop = newTop;
-            }
-            else if (m_draggingBottom) {
-                int newBottom = qMax(0, qMin(m_cropBottom - deltaImageY, m_originalImage.height() - m_cropTop - 10));
-                m_cropBottom = newBottom;
-            }
-
-            m_dragStartY = mouseY;
-            updatePreview();
+        if (m_draggingTop) {
+            // Вычисляем новую позицию на основе начального значения
+            int newTop = m_initialCropTop + deltaImageY;
+            // Ограничиваем значение
+            newTop = qMax(0, qMin(newTop, m_originalImage.height() - m_cropBottom - 10));
+            m_cropTop = newTop;
         }
+        else if (m_draggingBottom) {
+            // Вычисляем новую позицию на основе начального значения
+            int newBottom = m_initialCropBottom - deltaImageY;
+            // Ограничиваем значение
+            newBottom = qMax(0, qMin(newBottom, m_originalImage.height() - m_cropTop - 10));
+            m_cropBottom = newBottom;
+        }
+
+        updatePreview();
     }
 
     QDialog::mouseMoveEvent(event);
