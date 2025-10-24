@@ -1,4 +1,4 @@
-#include "MainWindow.h"
+﻿#include "MainWindow.h"
 #include "ui_MainWindow.h"
 #include "BusinessLogic.h"
 #include "CropDialog.h"
@@ -6,6 +6,17 @@
 #include <QMessageBox>
 #include <QDateTime>
 #include <QDir>
+#include <QListWidgetItem>
+#include <QPixmap>
+#include <QDirIterator>
+#include <QApplication>
+#include <QFile>
+#include <QTextStream>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QPushButton>
+#include <QLabel>
+#include <QTextEdit>
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
@@ -13,68 +24,160 @@ MainWindow::MainWindow(QWidget* parent)
     , m_businessLogic(new BusinessLogic)
     , m_businessThread(new QThread(this))
     , m_cropDialog(new CropDialog(this))
+    , m_settings(nullptr)
+    , m_justSavedImage(false)
+    , m_startVisionButton(nullptr)
+    , m_stopVisionButton(nullptr)
+    , m_visionStatusLabel(nullptr)
+    , m_visionResultsTextEdit(nullptr)
 {
     ui->setupUi(this);
 
-    // ==================== ��������� ���������� ��������� ====================
+    // ==================== УСТАНОВКА СТАРТОВОЙ ВКЛАДКИ ====================
+    ui->tabWidget->setCurrentIndex(0); // 0 = Сокет, 1 = Развёртка, 2 = Выбор рисунка
+
+    // ==================== ИНИЦИАЛИЗАЦИЯ НАСТРОЕК ====================
+    initializeSettings();
+
+    // ==================== НАСТРОЙКА НАЧАЛЬНОГО СОСТОЯНИЯ ====================
     ui->messageLineEdit->setPlaceholderText("Enter message to send...");
 
-    // ==================== ��������� ������ ��� ������-������ ====================
-    // ���������� ������-������ � ��������� ����� ��� �������������� ���������� GUI
+    // ==================== НАСТРОЙКА ПОТОКА ДЛЯ БИЗНЕС-ЛОГИКИ ====================
     m_businessLogic->moveToThread(m_businessThread);
     m_businessThread->start();
 
-    // ==================== ��������� ���������� �������� � ������ ====================
+    // ==================== НАСТРОЙКА СОЕДИНЕНИЙ СИГНАЛОВ И СЛОТОВ ====================
     setupConnections();
 
-    // ==================== ������������� ��������� ���������� ====================
+    // ==================== ДОБАВЛЕНИЕ ВКЛАДКИ КОМПЬЮТЕРНОГО ЗРЕНИЯ ====================
+    setupVisionTab();
+
+    // ==================== ИНИЦИАЛИЗАЦИЯ СОСТОЯНИЯ ИНТЕРФЕЙСА ====================
     updateSendButtonState();
     updateImageButtonsState();
+
+    // Инициализация списка изображений на третьей вкладке
+    updateResultsList();
 }
 
 MainWindow::~MainWindow()
 {
-    // ==================== ���������� ���������� ������ ====================
-    // ������� ���������� ������ ������ ������-������
+    // ==================== КОРРЕКТНОЕ ЗАВЕРШЕНИЕ ПОТОКА ====================
+    // Плавное завершение работы потока бизнес-логики
     m_businessThread->quit();
     m_businessThread->wait(1000);
 
-    // �������������� ���������� ���� ����� �� �������
+    // Принудительное завершение если поток не ответил
     if (m_businessThread->isRunning()) {
         m_businessThread->terminate();
         m_businessThread->wait();
     }
 
+    // Сохраняем настройки перед выходом
+    if (m_settings) {
+        m_settings->sync();
+        delete m_settings;
+    }
+
+    // Удаляем элементы компьютерного зрения
+    delete m_startVisionButton;
+    delete m_stopVisionButton;
+    delete m_visionStatusLabel;
+    delete m_visionResultsTextEdit;
+
     delete m_businessLogic;
     delete ui;
 }
 
-// ==================== ��������� ���������� ����� GUI � ������-������� ====================
+void MainWindow::initializeSettings()
+{
+    // Определяем путь к файлу настроек в папке с приложением
+    QString configPath = QApplication::applicationDirPath() + "/config.ini";
+
+    // Явно создаем файл настроек, если его нет
+    if (!QFile::exists(configPath)) {
+        QFile configFile(configPath);
+        if (configFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QTextStream out(&configFile);
+            out << "[General]\n";
+            out << "selectedPattern=\n";
+            configFile.close();
+            qDebug() << "Config file created at:" << configPath;
+        }
+        else {
+            qWarning() << "Failed to create config file at:" << configPath;
+        }
+    }
+    else {
+        // Файл уже существует - проверяем его структуру
+        QSettings tempSettings(configPath, QSettings::IniFormat);
+
+        // Если нет ключа selectedPattern - добавляем его
+        if (!tempSettings.contains("selectedPattern")) {
+            tempSettings.setValue("selectedPattern", "");
+            tempSettings.sync();
+            qDebug() << "Added missing selectedPattern key to existing config";
+        }
+    }
+
+    // Инициализируем QSettings с явным указанием пути к файлу
+    m_settings = new QSettings(configPath, QSettings::IniFormat, this);
+    qDebug() << "Using config file:" << m_settings->fileName();
+
+    // Логируем текущие настройки для отладки
+    qDebug() << "Current settings:";
+    QStringList allKeys = m_settings->allKeys();
+    for (const QString& key : allKeys) {
+        qDebug() << "  " << key << "=" << m_settings->value(key).toString();
+    }
+}
+
+// ==================== НАСТРОЙКА СОЕДИНЕНИЙ МЕЖДУ GUI И БИЗНЕС-ЛОГИКОЙ ====================
 void MainWindow::setupConnections()
 {
-    // ==================== ���������� ��� ������� "�����" ====================
+    // ==================== СОЕДИНЕНИЯ ДЛЯ ВКЛАДКИ "СОКЕТ" ====================
     connect(ui->connectButton, &QPushButton::clicked, this, &MainWindow::onConnectClicked);
     connect(ui->disconnectButton, &QPushButton::clicked, this, &MainWindow::onDisconnectClicked);
     connect(ui->clearLogButton, &QPushButton::clicked, this, &MainWindow::onClearLogClicked);
     connect(ui->sendMessageButton, &QPushButton::clicked, this, &MainWindow::onSendMessageClicked);
     connect(ui->messageLineEdit, &QLineEdit::textChanged, this, &MainWindow::onMessageTextChanged);
 
-    // ==================== ���������� ��� ������� "���¨����" ====================
+    // ==================== СОЕДИНЕНИЯ ДЛЯ ВКЛАДКИ "РАЗВЁРТКА" ====================
     connect(ui->loadImageButton, &QPushButton::clicked, this, &MainWindow::onLoadImageClicked);
     connect(ui->processImageButton, &QPushButton::clicked, this, &MainWindow::onProcessImageClicked);
     connect(ui->clearImageButton, &QPushButton::clicked, this, &MainWindow::onClearImageClicked);
 
-    // ==================== ���������� � ������-������� ====================
-    // ������� �� ������-������ � GUI (����������� ����������)
+    // ==================== СОЕДИНЕНИЯ ДЛЯ ВКЛАДКИ "ВЫБОР РИСУНКА" ====================
+    connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
+        if (index == 2) { // Индекс вкладки "Выбор рисунка"
+            onResultsTabActivated();
+        }
+        });
+    connect(ui->selectPatternButton, &QPushButton::clicked, this, &MainWindow::onSelectPatternClicked);
+    connect(ui->resultsListWidget, &QListWidget::itemSelectionChanged, this, &MainWindow::onPatternSelectionChanged);
+
+    // ==================== СОЕДИНЕНИЯ ДЛЯ ВКЛАДКИ "КОМПЬЮТЕРНОЕ ЗРЕНИЕ" ====================
+    connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
+        // Можно добавить логику при переключении на вкладку компьютерного зрения
+        });
+
+    // ==================== СОЕДИНЕНИЯ С БИЗНЕС-ЛОГИКОЙ ====================
+    // Сигналы от бизнес-логики к GUI (межпоточные соединения)
     connect(m_businessLogic, &BusinessLogic::logMessage, this, &MainWindow::onLogMessage);
     connect(m_businessLogic, &BusinessLogic::connectionStateChanged, this, &MainWindow::onConnectionStateChanged);
     connect(m_businessLogic, &BusinessLogic::imageLoaded, this, &MainWindow::onImageLoaded);
     connect(m_businessLogic, &BusinessLogic::imageProcessed, this, &MainWindow::onImageProcessed);
     connect(m_businessLogic, &BusinessLogic::imageCleared, this, &MainWindow::onImageCleared);
     connect(m_businessLogic, &BusinessLogic::socketError, this, &MainWindow::onSocketError);
+
+    // ==================== СОЕДИНЕНИЯ С БИЗНЕС-ЛОГИКОЙ ДЛЯ КОМПЬЮТЕРНОГО ЗРЕНИЯ ====================
+    connect(m_businessLogic, &BusinessLogic::visionResultReceived,
+        this, &MainWindow::onVisionResultReceived);
+    connect(m_businessLogic, &BusinessLogic::visionSystemError,
+        this, &MainWindow::onVisionSystemError);
 }
 
-// ==================== ���������� ������ ��� ������� "�����" ====================
+// ==================== РЕАЛИЗАЦИЯ СЛОТОВ ДЛЯ ВКЛАДКИ "СОКЕТ" ====================
 void MainWindow::onConnectClicked()
 {
     QString ip = ui->ipLineEdit->text();
@@ -106,10 +209,10 @@ void MainWindow::onMessageTextChanged(const QString& text)
         updateSendButtonState();
 }
 
-// ==================== ���������� ������ ��� ������� "���¨����" ====================
+// ==================== РЕАЛИЗАЦИЯ СЛОТОВ ДЛЯ ВКЛАДКИ "РАЗВЁРТКА" ====================
 void MainWindow::onLoadImageClicked()
 {
-    // ������ ������ ����� � ���������� ��������� ��������
+    // Диалог выбора файла с поддержкой различных форматов
     QString fileName = QFileDialog::getOpenFileName(this,
         "Select Image",
         "",
@@ -127,11 +230,15 @@ void MainWindow::onProcessImageClicked()
 
         QString filename = ui->netnamelineEdit->text().trimmed();
 
-        // �������� ���������� ����������� � ��� ����� � ������-������ ��� ����������
+        // Сохраняем имя файла для выделения на третьей вкладке и устанавливаем флаг
+        m_lastSavedImage = filename;
+        m_justSavedImage = true;
+
+        // Передаем обрезанное изображение и имя файла в бизнес-логику для сохранения
         m_businessLogic->processImage(m_croppedImage, filename);
     }
     else {
-        QMessageBox::warning(this, "��������������", "������� ��������� � �������� �����������");
+        QMessageBox::warning(this, "Предупреждение", "Сначала загрузите и обрежьте изображение");
     }
 }
 
@@ -142,17 +249,77 @@ void MainWindow::onClearImageClicked()
     m_croppedImage = QPixmap();
 }
 
-// ==================== ����� ��� ��������� �������� �� ������-������ ====================
+// ==================== РЕАЛИЗАЦИЯ СЛОТОВ ДЛЯ ВКЛАДКИ "ВЫБОР РИСУНКА" ====================
+void MainWindow::onResultsTabActivated()
+{
+    updateResultsList();
+    selectDefaultPattern();
+}
+
+void MainWindow::onSelectPatternClicked()
+{
+    QListWidgetItem* currentItem = ui->resultsListWidget->currentItem();
+    if (currentItem && m_settings) {
+        QString selectedFile = currentItem->data(Qt::UserRole).toString();
+        m_settings->setValue("selectedPattern", selectedFile);
+        m_settings->sync(); // Явно сохраняем изменения
+
+        onLogMessage("Выбран рисунок: " + selectedFile);
+        QMessageBox::information(this, "Выбор рисунка", "Рисунок '" + selectedFile + "' выбран и сохранен в настройках.");
+    }
+}
+
+void MainWindow::onPatternSelectionChanged()
+{
+    ui->selectPatternButton->setEnabled(ui->resultsListWidget->currentItem() != nullptr);
+}
+
+// ==================== РЕАЛИЗАЦИЯ СЛОТОВ ДЛЯ КОМПЬЮТЕРНОГО ЗРЕНИЯ ====================
+void MainWindow::onStartVisionClicked()
+{
+    m_businessLogic->startVisionSystem();
+    m_startVisionButton->setEnabled(false);
+    m_stopVisionButton->setEnabled(true);
+    m_visionStatusLabel->setText("Status: Running");
+    m_visionResultsTextEdit->append("Vision system started...");
+}
+
+void MainWindow::onStopVisionClicked()
+{
+    m_businessLogic->stopVisionSystem();
+    m_startVisionButton->setEnabled(true);
+    m_stopVisionButton->setEnabled(false);
+    m_visionStatusLabel->setText("Status: Stopped");
+    m_visionResultsTextEdit->append("Vision system stopped...");
+}
+
+void MainWindow::onVisionResultReceived(const QString& snapshotName, int xPosition, double totalTime)
+{
+    QString result = QString("[%1] X Position: %2, Processing Time: %3 ms")
+        .arg(snapshotName)
+        .arg(xPosition)
+        .arg(totalTime, 0, 'f', 2);
+
+    m_visionResultsTextEdit->append(result);
+}
+
+void MainWindow::onVisionSystemError(const QString& error)
+{
+    m_visionResultsTextEdit->append(QString("[ERROR] %1").arg(error));
+    QMessageBox::warning(this, "Vision System Error", error);
+}
+
+// ==================== СЛОТЫ ДЛЯ ОБРАБОТКИ СИГНАЛОВ ОТ БИЗНЕС-ЛОГИКИ ====================
 void MainWindow::onLogMessage(const QString& message)
 {
-    // ���������� ��������� ����� � ������� ��������� � ����
+    // Добавление временной метки к каждому сообщению в логе
     QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss");
     ui->logTextEdit->append(QString("[%1] %2").arg(timestamp, message));
 }
 
 void MainWindow::onConnectionStateChanged(bool connected)
 {
-    // ���������� ��������� ������ �����������/����������
+    // Обновление состояния кнопок подключения/отключения
     ui->connectButton->setEnabled(!connected);
     ui->disconnectButton->setEnabled(connected);
     updateSendButtonState();
@@ -162,14 +329,14 @@ void MainWindow::onImageLoaded(const QPixmap& originalImage, const QString& file
 {
     m_currentImage = originalImage;
 
-    // ���������� ������ ������������ ����� ������������ �����������
+    // Показываем диалог кадрирования перед отображением изображения
     m_cropDialog->setImage(originalImage);
 
     if (m_cropDialog->exec() == QDialog::Accepted) {
-        // �������� ������������� �����������
+        // Получаем кадрированное изображение
         m_croppedImage = m_cropDialog->getCroppedImage();
 
-        // ������������ ����������� ��� ����������� � preview
+        // Масштабируем изображение для отображения в preview
         QSize labelSize = ui->imagePreviewLabel->size();
         QPixmap scaledImage = m_croppedImage.scaled(
             labelSize.width() - 10,
@@ -178,10 +345,10 @@ void MainWindow::onImageLoaded(const QPixmap& originalImage, const QString& file
             Qt::SmoothTransformation
         );
 
-        // ������������� ����������� � ���������� � �����
+        // Устанавливаем изображение и информацию о файле
         ui->imagePreviewLabel->setPixmap(scaledImage);
 
-        // ��������� ������� � ������������ ���� ��� ���� ���������
+        // Добавляем пометку о кадрировании если оно было применено
         if (m_cropDialog->getCroppedImage().size() != originalImage.size()) {
             ui->imagePathLabel->setText(fileName + " (cropped)");
         }
@@ -189,18 +356,29 @@ void MainWindow::onImageLoaded(const QPixmap& originalImage, const QString& file
             ui->imagePathLabel->setText(fileName);
         }
 
-        // ��������� ���� ����� ����� � ������������� ��������������� ������
+        // Обновляем поле имени файла с автоматически сгенерированным именем
         updateNetNameEdit();
 
         updateImageButtonsState();
-        ui->tabWidget->setCurrentIndex(1); // ������������� �� ������� � ������������
+        ui->tabWidget->setCurrentIndex(1); // Переключаемся на вкладку с изображением
     }
 }
 
 void MainWindow::onImageProcessed()
 {
     ui->processImageButton->setEnabled(true);
-    ui->tabWidget->setCurrentIndex(2); // ������������� �� ������� "����������"
+
+    // Обновляем список на третьей вкладке
+    updateResultsList();
+
+    // Выделяем только что сохраненный файл
+    if (m_justSavedImage && !m_lastSavedImage.isEmpty()) {
+        selectFileInList(m_lastSavedImage);
+        m_justSavedImage = false; // Сбрасываем флаг после использования
+    }
+
+    // Переключаемся на вкладку "Выбор рисунка"
+    ui->tabWidget->setCurrentIndex(2);
 }
 
 void MainWindow::onImageCleared()
@@ -217,10 +395,10 @@ void MainWindow::onSocketError(const QString& error)
     QMessageBox::warning(this, "Connection Error", error);
 }
 
-// ==================== ��������������� ������ ====================
+// ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
 void MainWindow::updateSendButtonState()
 {
-    // ������ �������� ������� ������ ��� ������� ������ � ������������� ����������
+    // Кнопка отправки активна только при наличии текста и установленном соединении
     bool hasText = !ui->messageLineEdit->text().trimmed().isEmpty();
     bool isConnected = ui->disconnectButton->isEnabled();
     ui->sendMessageButton->setEnabled(hasText && isConnected);
@@ -228,7 +406,7 @@ void MainWindow::updateSendButtonState()
 
 void MainWindow::updateImageButtonsState()
 {
-    // ������ ��������� � ������� ������� ������ ��� ����������� �����������
+    // Кнопки обработки и очистки активны только при загруженном изображении
     bool hasImage = !ui->imagePathLabel->text().isEmpty() &&
         ui->imagePathLabel->text() != "No file selected";
     ui->processImageButton->setEnabled(hasImage);
@@ -257,4 +435,126 @@ void MainWindow::updateNetNameEdit()
 {
     QString nextFilename = getNextAvailableFilename();
     ui->netnamelineEdit->setText(nextFilename);
+}
+
+void MainWindow::updateResultsList()
+{
+    ui->resultsListWidget->clear();
+
+    QDir netsurfacesDir("netsurfaces");
+    if (!netsurfacesDir.exists()) {
+        netsurfacesDir.mkpath(".");
+        return;
+    }
+
+    // Поддерживаемые форматы изображений
+    QStringList filters;
+    filters << "*.png" << "*.jpg" << "*.jpeg" << "*.bmp" << "*.tiff";
+
+    QFileInfoList fileList = netsurfacesDir.entryInfoList(filters, QDir::Files, QDir::Name);
+
+    for (const QFileInfo& fileInfo : fileList) {
+        QListWidgetItem* item = new QListWidgetItem(ui->resultsListWidget);
+
+        // Загружаем уменьшенное изображение для превью
+        QPixmap pixmap(fileInfo.absoluteFilePath());
+        if (!pixmap.isNull()) {
+            // Масштабируем до размера иконки
+            QPixmap scaledPixmap = pixmap.scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            item->setIcon(QIcon(scaledPixmap));
+        }
+
+        item->setText(fileInfo.fileName());
+        item->setData(Qt::UserRole, fileInfo.fileName());
+
+        // Показываем полное имя файла как подсказку
+        item->setToolTip(fileInfo.fileName());
+    }
+}
+
+void MainWindow::selectDefaultPattern()
+{
+    if (ui->resultsListWidget->count() == 0) {
+        ui->selectPatternButton->setEnabled(false);
+        return;
+    }
+
+    QString patternToSelect;
+
+    // Если только что сохранили изображение - выделяем его
+    if (m_justSavedImage && !m_lastSavedImage.isEmpty()) {
+        patternToSelect = m_lastSavedImage;
+        m_justSavedImage = false; // Сбрасываем флаг после использования
+    }
+    else if (m_settings) {
+        // Иначе читаем из конфига
+        patternToSelect = m_settings->value("selectedPattern").toString();
+    }
+
+    // Ищем файл в списке
+    if (!patternToSelect.isEmpty()) {
+        selectFileInList(patternToSelect);
+        return;
+    }
+
+    // Если не нашли или конфиг пуст - выделяем первый элемент
+    if (ui->resultsListWidget->count() > 0) {
+        ui->resultsListWidget->setCurrentRow(0);
+    }
+}
+
+void MainWindow::selectFileInList(const QString& fileName)
+{
+    // Убедимся, что имя файла имеет расширение .png
+    QString searchName = fileName;
+    if (!searchName.endsWith(".png", Qt::CaseInsensitive)) {
+        searchName += ".png";
+    }
+
+    // Ищем файл в списке
+    QList<QListWidgetItem*> items = ui->resultsListWidget->findItems(searchName, Qt::MatchExactly);
+    if (!items.isEmpty()) {
+        items.first()->setSelected(true);
+        ui->resultsListWidget->setCurrentItem(items.first());
+        ui->resultsListWidget->scrollToItem(items.first());
+    }
+    else {
+        // Если не нашли точное совпадение, выделяем первый элемент
+        if (ui->resultsListWidget->count() > 0) {
+            ui->resultsListWidget->setCurrentRow(0);
+        }
+    }
+}
+
+void MainWindow::setupVisionTab()
+{
+    QWidget* visionTab = new QWidget();
+    QVBoxLayout* visionLayout = new QVBoxLayout(visionTab);
+
+    // Создаем элементы управления
+    QHBoxLayout* controlLayout = new QHBoxLayout();
+    m_startVisionButton = new QPushButton("Start Vision System");
+    m_stopVisionButton = new QPushButton("Stop Vision System");
+    m_visionStatusLabel = new QLabel("Status: Stopped");
+
+    m_stopVisionButton->setEnabled(false);
+
+    controlLayout->addWidget(m_startVisionButton);
+    controlLayout->addWidget(m_stopVisionButton);
+    controlLayout->addWidget(m_visionStatusLabel);
+    controlLayout->addStretch();
+
+    m_visionResultsTextEdit = new QTextEdit();
+    m_visionResultsTextEdit->setReadOnly(true);
+    m_visionResultsTextEdit->setPlaceholderText("Vision system results will appear here...");
+
+    visionLayout->addLayout(controlLayout);
+    visionLayout->addWidget(m_visionResultsTextEdit);
+
+    // Добавляем вкладку в tabWidget
+    ui->tabWidget->addTab(visionTab, "Computer Vision");
+
+    // Подключаем кнопки
+    connect(m_startVisionButton, &QPushButton::clicked, this, &MainWindow::onStartVisionClicked);
+    connect(m_stopVisionButton, &QPushButton::clicked, this, &MainWindow::onStopVisionClicked);
 }

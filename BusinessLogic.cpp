@@ -1,24 +1,59 @@
-#include "BusinessLogic.h"
+﻿#include "BusinessLogic.h"
+#include "VisionSystemManager.h"
 #include <QFileInfo>
 #include <QDir>
 
 BusinessLogic::BusinessLogic(QObject* parent)
     : QObject(parent)
     , m_tcpSocket(new QTcpSocket(this))
+    , m_visionManager(nullptr)
+    , m_visionThread(new QThread(this))
 {
     setupSocketConnections();
+
+    // Инициализация системы компьютерного зрения
+    m_visionManager = new VisionSystemManager();
+    m_visionManager->moveToThread(m_visionThread);
+
+    // Подключаем сигналы системы компьютерного зрения
+    connect(m_visionManager, &VisionSystemManager::visionResultReady,
+        this, &BusinessLogic::visionResultReceived);
+    connect(m_visionManager, &VisionSystemManager::visionError,
+        this, &BusinessLogic::visionSystemError);
+    connect(m_visionManager, &VisionSystemManager::visionLogMessage,
+        this, &BusinessLogic::logMessage);
+    connect(m_visionManager, &VisionSystemManager::visionStatusChanged,
+        this, &BusinessLogic::visionStatusChanged);
+
+    // Сигнал для отправки результатов через сокет
+    connect(this, &BusinessLogic::visionResultReceived,
+        this, &BusinessLogic::sendVisionResult);
+
+    m_visionThread->start();
+
     emit logMessage("Business logic initialized");
+    emit logMessage("Vision system ready");
 }
 
 BusinessLogic::~BusinessLogic()
 {
+    // Останавливаем систему компьютерного зрения
+    if (m_visionManager) {
+        m_visionManager->stopVisionSystem();
+    }
+
+    if (m_visionThread && m_visionThread->isRunning()) {
+        m_visionThread->quit();
+        m_visionThread->wait(1000);
+    }
+
     if (m_tcpSocket->state() == QAbstractSocket::ConnectedState) {
         m_tcpSocket->disconnectFromHost();
         m_tcpSocket->waitForDisconnected(1000);
     }
 }
 
-// ==================== ��������� ���������� ====================
+// ==================== НАСТРОЙКА СОЕДИНЕНИЙ ====================
 
 void BusinessLogic::setupSocketConnections()
 {
@@ -28,7 +63,7 @@ void BusinessLogic::setupSocketConnections()
     connect(m_tcpSocket, &QTcpSocket::readyRead, this, &BusinessLogic::onSocketReadyRead);
 }
 
-// ==================== ����� ��� ������ � �������� ====================
+// ==================== СЛОТЫ ДЛЯ РАБОТЫ С СОКЕТАМИ ====================
 
 void BusinessLogic::connectToHost(const QString& ip, quint16 port)
 {
@@ -53,12 +88,12 @@ void BusinessLogic::sendMessage(const QString& message)
     }
 }
 
-// ==================== ����� ��� ������ � ������������� ====================
+// ==================== СЛОТЫ ДЛЯ РАБОТЫ С ИЗОБРАЖЕНИЯМИ ====================
 
 void BusinessLogic::loadImage(const QString& filePath)
 {
     try {
-        // ���������� ������� ��� �������� ����������� ����������
+        // Используем фабрику для создания подходящего загрузчика
         auto loader = ImageLoaderFactory::createLoader(filePath);
         QPixmap image = loader->load(filePath);
 
@@ -66,7 +101,7 @@ void BusinessLogic::loadImage(const QString& filePath)
             m_currentImage = image;
             m_currentImagePath = filePath;
 
-            // �������� ������������ ����������� (��������������� ������ � GUI)
+            // Передаем оригинальное изображение (масштабирование теперь в GUI)
             emit imageLoaded(image, QFileInfo(filePath).fileName());
             emit logMessage("Image loaded: " + filePath);
         }
@@ -117,7 +152,33 @@ void BusinessLogic::clearImage()
     emit logMessage("Image cleared");
 }
 
-// ==================== ����������� ������� ������ ====================
+// ==================== КОМПЬЮТЕРНОЕ ЗРЕНИЕ ====================
+
+void BusinessLogic::startVisionSystem()
+{
+    QMetaObject::invokeMethod(m_visionManager, "startVisionSystem");
+    emit logMessage("Starting vision system...");
+}
+
+void BusinessLogic::stopVisionSystem()
+{
+    QMetaObject::invokeMethod(m_visionManager, "stopVisionSystem");
+    emit logMessage("Stopping vision system...");
+}
+
+void BusinessLogic::sendVisionResult(const QString& snapshotName, int xPosition, double totalTime)
+{
+    // Формируем сообщение в том же формате, что и в оригинальном проекте
+    QString message = QString("%1;Position:%2;Time:%3 ms")
+        .arg(snapshotName)
+        .arg(xPosition)
+        .arg(totalTime, 0, 'f', 2);
+
+    // Отправляем через существующий сокет
+    sendMessage(message);
+}
+
+// ==================== ОБРАБОТЧИКИ СОБЫТИЙ СОКЕТА ====================
 
 void BusinessLogic::onSocketConnected()
 {
@@ -146,7 +207,7 @@ void BusinessLogic::onSocketReadyRead()
     emit logMessage(QString("Received: %1").arg(message));
 }
 
-// ==================== ��������������� ������ ====================
+// ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
 
 QString BusinessLogic::getNextAvailableFilename()
 {

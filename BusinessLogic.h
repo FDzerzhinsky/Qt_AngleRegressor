@@ -6,8 +6,11 @@
 #include <QTimer>
 #include <QPdfDocument>
 #include <QDir>
+#include <QThread>
 
 #include "ImageLoader.h"
+
+class VisionSystemManager;
 
 class BusinessLogic : public QObject
 {
@@ -28,6 +31,11 @@ public slots:
     void processImage(const QPixmap& croppedImage, const QString& fileName);
     void clearImage();
 
+    // ==================== йнлоэчрепмне гпемхе ====================
+    void startVisionSystem();
+    void stopVisionSystem();
+    void sendVisionResult(const QString& snapshotName, int xPosition, double totalTime);
+
 signals:
     // ==================== яхцмюкш дкъ GUI ====================
     void logMessage(const QString& message);
@@ -36,6 +44,11 @@ signals:
     void imageProcessed();
     void imageCleared();
     void socketError(const QString& error);
+
+    // ==================== яхцмюкш йнлоэчрепмнцн гпемхъ ====================
+    void visionResultReceived(const QString& snapshotName, int xPosition, double totalTime);
+    void visionSystemError(const QString& error);
+    void visionStatusChanged(bool running);
 
 private slots:
     // ==================== бмсрпеммхе якнрш ====================
@@ -49,6 +62,10 @@ private:
     QTcpSocket* m_tcpSocket;
     QPixmap m_currentImage;
     QString m_currentImagePath;
+
+    // ==================== йнлоэчрепмне гпемхе ====================
+    VisionSystemManager* m_visionManager;
+    QThread* m_visionThread;
 
     // ==================== бяонлнцюрекэмше лерндш ====================
     void setupSocketConnections();

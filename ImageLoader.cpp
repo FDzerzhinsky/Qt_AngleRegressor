@@ -1,11 +1,11 @@
-#include "ImageLoader.h"
+п»ї#include "ImageLoader.h"
 #include <QPdfDocument>
 #include <QImage>
 #include <QGuiApplication>
 #include <QScreen>
 #include <QDebug>
 
-// Реализация StandardImageLoader
+// Р РµР°Р»РёР·Р°С†РёСЏ StandardImageLoader
 QPixmap StandardImageLoader::load(const QString& filePath) {
     QPixmap image(filePath);
     if (image.isNull()) {
@@ -19,32 +19,32 @@ bool StandardImageLoader::canLoad(const QString& filePath) {
     return m_supportedFormats.contains(extension);
 }
 
-// Реализация PdfImageLoader
+// Р РµР°Р»РёР·Р°С†РёСЏ PdfImageLoader
 QPixmap PdfImageLoader::load(const QString& filePath) {
-    // Создаем документ на стеке (без умного указателя)
+    // РЎРѕР·РґР°РµРј РґРѕРєСѓРјРµРЅС‚ РЅР° СЃС‚РµРєРµ (Р±РµР· СѓРјРЅРѕРіРѕ СѓРєР°Р·Р°С‚РµР»СЏ)
     QPdfDocument pdfDocument;
 
-    // Загружаем PDF документ
+    // Р—Р°РіСЂСѓР¶Р°РµРј PDF РґРѕРєСѓРјРµРЅС‚
     if (pdfDocument.load(filePath) != QPdfDocument::Error::None) {
         throw std::runtime_error("Failed to load PDF document");
     }
 
-    // Проверяем количество страниц
+    // РџСЂРѕРІРµСЂСЏРµРј РєРѕР»РёС‡РµСЃС‚РІРѕ СЃС‚СЂР°РЅРёС†
     if (pdfDocument.pageCount() != 1) {
         throw std::runtime_error("PDF must contain exactly one page");
     }
 
-    // Получаем реальный DPI системы
+    // РџРѕР»СѓС‡Р°РµРј СЂРµР°Р»СЊРЅС‹Р№ DPI СЃРёСЃС‚РµРјС‹
     QScreen* screen = QGuiApplication::primaryScreen();
     qreal realDpi = screen ? screen->logicalDotsPerInch() : 96.0;
 
-    // Получаем размер страницы в пунктах (1/72 дюйма)
+    // РџРѕР»СѓС‡Р°РµРј СЂР°Р·РјРµСЂ СЃС‚СЂР°РЅРёС†С‹ РІ РїСѓРЅРєС‚Р°С… (1/72 РґСЋР№РјР°)
     QSizeF pageSizeInPoints = pdfDocument.pagePointSize(0);
     if (pageSizeInPoints.isEmpty()) {
         throw std::runtime_error("Failed to get page size");
     }
 
-    // Конвертируем в пиксели с использованием реального DPI
+    // РљРѕРЅРІРµСЂС‚РёСЂСѓРµРј РІ РїРёРєСЃРµР»Рё СЃ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёРµРј СЂРµР°Р»СЊРЅРѕРіРѕ DPI
     int renderWidth = static_cast<int>(pageSizeInPoints.width() * realDpi / 72.0);
     int renderHeight = static_cast<int>(pageSizeInPoints.height() * realDpi / 72.0);
 
@@ -52,17 +52,17 @@ QPixmap PdfImageLoader::load(const QString& filePath) {
     qDebug() << "Real DPI:" << realDpi;
     qDebug() << "Render size:" << renderWidth << "x" << renderHeight;
 
-    // Рендерим с высоким качеством - ВАЖНО: вызываем render у объекта, а не указателя!
+    // Р РµРЅРґРµСЂРёРј СЃ РІС‹СЃРѕРєРёРј РєР°С‡РµСЃС‚РІРѕРј - Р’РђР–РќРћ: РІС‹Р·С‹РІР°РµРј render Сѓ РѕР±СЉРµРєС‚Р°, Р° РЅРµ СѓРєР°Р·Р°С‚РµР»СЏ!
     QImage image = pdfDocument.render(0, QSize(renderWidth, renderHeight));
 
-    // Явно завершаем работу с документом
+    // РЇРІРЅРѕ Р·Р°РІРµСЂС€Р°РµРј СЂР°Р±РѕС‚Сѓ СЃ РґРѕРєСѓРјРµРЅС‚РѕРј
     pdfDocument.close();
 
     if (image.isNull()) {
         throw std::runtime_error("Failed to render PDF page");
     }
 
-    // Создаем QPixmap напрямую из QImage
+    // РЎРѕР·РґР°РµРј QPixmap РЅР°РїСЂСЏРјСѓСЋ РёР· QImage
     QPixmap pixmap = QPixmap::fromImage(image);
 
     if (pixmap.isNull()) {
@@ -72,15 +72,15 @@ QPixmap PdfImageLoader::load(const QString& filePath) {
     return pixmap;
 }
 
-// УБЕДИТЕСЬ, ЧТО ЭТА ФУНКЦИЯ ПРИСУТСТВУЕТ!
+// РЈР‘Р•Р”РРўР•РЎР¬, Р§РўРћ Р­РўРђ Р¤РЈРќРљР¦РРЇ РџР РРЎРЈРўРЎРўР’РЈР•Рў!
 bool PdfImageLoader::canLoad(const QString& filePath) {
     QString extension = QFileInfo(filePath).suffix().toLower();
     return extension == "pdf";
 }
 
-// Реализация ImageLoaderFactory
+// Р РµР°Р»РёР·Р°С†РёСЏ ImageLoaderFactory
 std::unique_ptr<ImageLoader> ImageLoaderFactory::createLoader(const QString& filePath) {
-    // Создаем загрузчики и проверяем, какой может обработать файл
+    // РЎРѕР·РґР°РµРј Р·Р°РіСЂСѓР·С‡РёРєРё Рё РїСЂРѕРІРµСЂСЏРµРј, РєР°РєРѕР№ РјРѕР¶РµС‚ РѕР±СЂР°Р±РѕС‚Р°С‚СЊ С„Р°Р№Р»
     auto pdfLoader = std::make_unique<PdfImageLoader>();
     auto standardLoader = std::make_unique<StandardImageLoader>();
 
@@ -91,5 +91,6 @@ std::unique_ptr<ImageLoader> ImageLoaderFactory::createLoader(const QString& fil
         return standardLoader;
     }
 
-    throw std::runtime_error("Unsupported file format");
+    //throw std::runtime_error("Unsupported file format");
+
 }

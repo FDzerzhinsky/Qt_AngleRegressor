@@ -20,6 +20,11 @@ CropDialog::CropDialog(QWidget * parent) :
 {
     ui->setupUi(this);
 
+    // ЯВНАЯ НАСТРОЙКА PREVIEW LABEL
+    ui->previewLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    ui->previewLabel->setAlignment(Qt::AlignCenter);
+    ui->previewLabel->setMinimumSize(400, 300); // Минимальный размер
+
     // Настройка окна - разрешаем разворачивание на весь экран
     setWindowFlags(windowFlags() | Qt::WindowMaximizeButtonHint);
 

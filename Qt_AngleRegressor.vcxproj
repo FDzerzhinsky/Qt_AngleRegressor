@@ -60,8 +60,12 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <IncludePath>C:\dev\OpenCV_cpp\opencv\build\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\dev\OpenCV_cpp\opencv\build\x64\vc16\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <IncludePath>C:\dev\OpenCV_cpp\opencv\build\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\dev\OpenCV_cpp\opencv\build\x64\vc16\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -72,12 +76,13 @@
     <ClCompile>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <DisableLanguageExtensions>true</DisableLanguageExtensions>
-      <AdditionalIncludeDirectories>C:\Qt\6.10.0\msvc2022_64\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\dev\OpenCV\opencv\build\include;C:\Program Files (x86)\MVS\Development\Includes;C:\Qt\6.10.0\msvc2022_64\include;C:\dev\OpenCV\opencv\build\include\opencv2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>QT_PDF_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>C:\Qt\6.10.0\msvc2022_64\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Qt6Core.lib;Qt6Gui.lib;Qt6Widgets.lib;Qt6Network.lib;Qt6Concurrent.lib;Qt6Multimedia.lib;Qt6OpenGL.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files %28x86%29\MVS\Development\Libraries\win64;C:\Qt\6.10.0\msvc2022_64\lib;C:\dev\OpenCV\opencv\build\x64\vc16\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>Qt6Core.lib;Qt6Gui.lib;Qt6Widgets.lib;Qt6Network.lib;Qt6Concurrent.lib;Qt6Multimedia.lib;Qt6OpenGL.lib;opencv_world4120d.lib;MvCameraControl.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -89,12 +94,13 @@
     <ClCompile>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <DisableLanguageExtensions>true</DisableLanguageExtensions>
-      <AdditionalIncludeDirectories>C:\Qt\6.10.0\msvc2022_64\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\dev\OpenCV\opencv\build\include;C:\Program Files (x86)\MVS\Development\Includes;C:\Qt\6.10.0\msvc2022_64\include;C:\dev\OpenCV\opencv\build\include\opencv2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>QT_PDF_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>C:\Qt\6.10.0\msvc2022_64\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Qt6Core.lib;Qt6Gui.lib;Qt6Widgets.lib;Qt6Network.lib;Qt6Concurrent.lib;Qt6Multimedia.lib;Qt6OpenGL.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files %28x86%29\MVS\Development\Libraries\win64;C:\Qt\6.10.0\msvc2022_64\lib;C:\dev\OpenCV\opencv\build\x64\vc16\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>Qt6Core.lib;Qt6Gui.lib;Qt6Widgets.lib;Qt6Network.lib;Qt6Concurrent.lib;Qt6Multimedia.lib;Qt6OpenGL.lib;opencv_world4120.lib;MvCameraControl.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
@@ -126,6 +132,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="angle.cpp" />
+    <ClCompile Include="capture.cpp" />
+    <ClCompile Include="VisionSystemManager.cpp" />
     <QtUic Include="CropDialog.ui" />
     <QtUic Include="MainWindow.ui" />
     <ClCompile Include="BusinessLogic.cpp" />
@@ -141,7 +150,10 @@
     <QtMoc Include="BusinessLogic.h" />
   </ItemGroup>
   <ItemGroup>
+    <QtMoc Include="VisionSystemManager.h" />
     <QtMoc Include="CropDialog.h" />
+    <ClInclude Include="angle.h" />
+    <ClInclude Include="capture.h" />
     <ClInclude Include="ImageLoader.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
