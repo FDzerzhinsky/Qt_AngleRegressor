@@ -91,6 +91,7 @@ std::unique_ptr<ImageLoader> ImageLoaderFactory::createLoader(const QString& fil
         return standardLoader;
     }
 
-    //throw std::runtime_error("Unsupported file format");
-
+    // Если формат не поддерживается, возвращаем стандартный загрузчик
+    // и позволим ему выбросить исключение при загрузке
+    return standardLoader;
 }

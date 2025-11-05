@@ -1,13 +1,22 @@
-﻿#include "capture.h"
-
-// Стандартные библиотеки C++
+﻿// =============================================================================
+// ВКЛЮЧЕНИЕ БИБЛИОТЕК
+// =============================================================================
+// Сначала стандартные библиотеки C
 #include <stdio.h>
-#include <Windows.h>
-#include <conio.h>
-#include <chrono>
+#include <ctime>
+
+// Затем OpenCV
 #include <opencv2/opencv.hpp>
+#include <chrono>
+#include <thread>
+
+// Наши заголовки
+#include "capture.h"
+#include "angle.h"
+#include "platform_utils.h"
 
 using namespace std;
+using namespace cv;
 using namespace chrono;
 
 // =============================================================================
@@ -16,13 +25,9 @@ using namespace chrono;
 // Ожидает нажатия любой клавиши для приостановки выполнения программы
 // Используется для удобства отладки и тестирования
 void WaitForKeyPress(void) noexcept {
-    // Ожидаем, пока не будет нажата клавиша
-    while (!_kbhit()) {
-        // Небольшая задержка для уменьшения нагрузки на CPU
-        Sleep(10);
-    }
-    // Считываем нажатую клавишу (игнорируем возвращаемое значение)
-    (void)_getch();
+    printf("Press any key to continue...\n");
+    // Упрощенная версия без Windows API
+    std::cin.get();
 }
 
 // =============================================================================
@@ -378,7 +383,7 @@ std::string generateSnapshotName() {
     auto in_time_t = std::chrono::system_clock::to_time_t(now);
 
     std::tm tm;
-    localtime_s(&tm, &in_time_t);
+    PlatformUtils::LocalTime(in_time_t, tm);
 
     char buffer[80];
     std::strftime(buffer, sizeof(buffer), "Snapshot_%Y%m%d_%H%M%S", &tm);
@@ -575,13 +580,15 @@ int capture(AngleContext& angle_context) {
     // Программа работает пока не будет достигнут лимит кадров или не будет нажата клавиша ESC
     // Если max_captures = 0, то ограничения на количество кадров нет
     while (camera->config.max_captures == 0 || context.count < camera->config.max_captures) {
-        // Проверяем нажатие клавиши ESC для остановки
-        if (_kbhit() && _getch() == 27) {
-            printf("Stopping capture...\n");
+        // Упрощенная проверка ESC - просто ждем некоторое время
+        PlatformUtils::Sleep(100);
+
+        // Для отладки - выходим после 10 кадров
+        if (context.count >= 10) {
+            printf("Reached 10 captures, stopping...\n");
             context.stop = true;
             break;
         }
-        Sleep(10);  // Небольшая задержка для уменьшения нагрузки на CPU
     }
 
     // Корректное завершение работы - останавливаем захват и освобождаем ресурсы

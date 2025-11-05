@@ -77,8 +77,11 @@
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <DisableLanguageExtensions>true</DisableLanguageExtensions>
       <AdditionalIncludeDirectories>C:\dev\OpenCV\opencv\build\include;C:\Program Files (x86)\MVS\Development\Includes;C:\Qt\6.10.0\msvc2022_64\include;C:\dev\OpenCV\opencv\build\include\opencv2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>QT_PDF_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>QT_PDF_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <DisableSpecificWarnings>4828;4309;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>C:\Program Files %28x86%29\MVS\Development\Libraries\win64;C:\Qt\6.10.0\msvc2022_64\lib;C:\dev\OpenCV\opencv\build\x64\vc16\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -95,8 +98,11 @@
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <DisableLanguageExtensions>true</DisableLanguageExtensions>
       <AdditionalIncludeDirectories>C:\dev\OpenCV\opencv\build\include;C:\Program Files (x86)\MVS\Development\Includes;C:\Qt\6.10.0\msvc2022_64\include;C:\dev\OpenCV\opencv\build\include\opencv2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>QT_PDF_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>QT_PDF_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <DisableSpecificWarnings>4828;4309;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>C:\Program Files %28x86%29\MVS\Development\Libraries\win64;C:\Qt\6.10.0\msvc2022_64\lib;C:\dev\OpenCV\opencv\build\x64\vc16\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -150,6 +156,7 @@
     <QtMoc Include="BusinessLogic.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="platform_utils.h" />
     <QtMoc Include="VisionSystemManager.h" />
     <QtMoc Include="CropDialog.h" />
     <ClInclude Include="angle.h" />
