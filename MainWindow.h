@@ -3,12 +3,12 @@
 #include <QMainWindow>
 #include <QThread>
 #include <QSettings>
-#include <QPushButton>      // Добавляем
-#include <QLabel>           // Добавляем  
-#include <QTextEdit>        // Добавляем
-#include <QVBoxLayout>      // Добавляем
-#include <QHBoxLayout>      // Добавляем
-#include <QMessageBox>      // Добавляем
+#include <QPushButton>
+#include <QLabel>
+#include <QTextEdit>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QMessageBox>
 
 // Предварительное объявление классов
 class BusinessLogic;
@@ -72,12 +72,6 @@ private:
     QSettings* m_settings;
     bool m_justSavedImage;  // Флаг, указывающий что мы только что сохранили изображение
 
-    // ==================== КОМПЬЮТЕРНОЕ ЗРЕНИЕ ====================
-    QPushButton* m_startVisionButton;
-    QPushButton* m_stopVisionButton;
-    QLabel* m_visionStatusLabel;
-    QTextEdit* m_visionResultsTextEdit;
-
     // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
     void setupConnections();
     void updateSendButtonState();
@@ -88,5 +82,4 @@ private:
     void selectDefaultPattern();
     void initializeSettings();
     void selectFileInList(const QString& fileName);
-    void setupVisionTab();  // Добавляем объявление
 };

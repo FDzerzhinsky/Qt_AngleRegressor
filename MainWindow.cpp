@@ -17,8 +17,9 @@
 #include <QPushButton>
 #include <QLabel>
 #include <QTextEdit>
+#include <QDebug>
 
-MainWindow::MainWindow(QWidget* parent)
+MainWindow::MainWindow(QWidget * parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , m_businessLogic(new BusinessLogic)
@@ -26,10 +27,6 @@ MainWindow::MainWindow(QWidget* parent)
     , m_cropDialog(new CropDialog(this))
     , m_settings(nullptr)
     , m_justSavedImage(false)
-    , m_startVisionButton(nullptr)
-    , m_stopVisionButton(nullptr)
-    , m_visionStatusLabel(nullptr)
-    , m_visionResultsTextEdit(nullptr)
 {
     ui->setupUi(this);
 
@@ -48,9 +45,6 @@ MainWindow::MainWindow(QWidget* parent)
 
     // ==================== НАСТРОЙКА СОЕДИНЕНИЙ СИГНАЛОВ И СЛОТОВ ====================
     setupConnections();
-
-    // ==================== ДОБАВЛЕНИЕ ВКЛАДКИ КОМПЬЮТЕРНОГО ЗРЕНИЯ ====================
-    setupVisionTab();
 
     // ==================== ИНИЦИАЛИЗАЦИЯ СОСТОЯНИЯ ИНТЕРФЕЙСА ====================
     updateSendButtonState();
@@ -78,12 +72,6 @@ MainWindow::~MainWindow()
         m_settings->sync();
         delete m_settings;
     }
-
-    // Удаляем элементы компьютерного зрения
-    delete m_startVisionButton;
-    delete m_stopVisionButton;
-    delete m_visionStatusLabel;
-    delete m_visionResultsTextEdit;
 
     delete m_businessLogic;
     delete ui;
@@ -157,9 +145,9 @@ void MainWindow::setupConnections()
     connect(ui->resultsListWidget, &QListWidget::itemSelectionChanged, this, &MainWindow::onPatternSelectionChanged);
 
     // ==================== СОЕДИНЕНИЯ ДЛЯ ВКЛАДКИ "КОМПЬЮТЕРНОЕ ЗРЕНИЕ" ====================
-    connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
-        // Можно добавить логику при переключении на вкладку компьютерного зрения
-        });
+    // ВАЖНО: Подключаем кнопки компьютерного зрения напрямую
+    connect(ui->startVisionButton, &QPushButton::clicked, this, &MainWindow::onStartVisionClicked);
+    connect(ui->stopVisionButton, &QPushButton::clicked, this, &MainWindow::onStopVisionClicked);
 
     // ==================== СОЕДИНЕНИЯ С БИЗНЕС-ЛОГИКОЙ ====================
     // Сигналы от бизнес-логики к GUI (межпоточные соединения)
@@ -277,20 +265,22 @@ void MainWindow::onPatternSelectionChanged()
 // ==================== РЕАЛИЗАЦИЯ СЛОТОВ ДЛЯ КОМПЬЮТЕРНОГО ЗРЕНИЯ ====================
 void MainWindow::onStartVisionClicked()
 {
+    qDebug() << "MainWindow::onStartVisionClicked() - Starting vision system";
     m_businessLogic->startVisionSystem();
-    m_startVisionButton->setEnabled(false);
-    m_stopVisionButton->setEnabled(true);
-    m_visionStatusLabel->setText("Status: Running");
-    m_visionResultsTextEdit->append("Vision system started...");
+    ui->startVisionButton->setEnabled(false);
+    ui->stopVisionButton->setEnabled(true);
+    ui->visionStatusLabel->setText("Status: Running");
+    ui->visionResultsTextEdit->append("Vision system started...");
 }
 
 void MainWindow::onStopVisionClicked()
 {
+    qDebug() << "MainWindow::onStopVisionClicked() - Stopping vision system";
     m_businessLogic->stopVisionSystem();
-    m_startVisionButton->setEnabled(true);
-    m_stopVisionButton->setEnabled(false);
-    m_visionStatusLabel->setText("Status: Stopped");
-    m_visionResultsTextEdit->append("Vision system stopped...");
+    ui->startVisionButton->setEnabled(true);
+    ui->stopVisionButton->setEnabled(false);
+    ui->visionStatusLabel->setText("Status: Stopped");
+    ui->visionResultsTextEdit->append("Vision system stopped...");
 }
 
 void MainWindow::onVisionResultReceived(const QString& snapshotName, int xPosition, double totalTime)
@@ -300,12 +290,12 @@ void MainWindow::onVisionResultReceived(const QString& snapshotName, int xPositi
         .arg(xPosition)
         .arg(totalTime, 0, 'f', 2);
 
-    m_visionResultsTextEdit->append(result);
+    ui->visionResultsTextEdit->append(result);
 }
 
 void MainWindow::onVisionSystemError(const QString& error)
 {
-    m_visionResultsTextEdit->append(QString("[ERROR] %1").arg(error));
+    ui->visionResultsTextEdit->append(QString("[ERROR] %1").arg(error));
     QMessageBox::warning(this, "Vision System Error", error);
 }
 
@@ -524,37 +514,4 @@ void MainWindow::selectFileInList(const QString& fileName)
             ui->resultsListWidget->setCurrentRow(0);
         }
     }
-}
-
-void MainWindow::setupVisionTab()
-{
-    QWidget* visionTab = new QWidget();
-    QVBoxLayout* visionLayout = new QVBoxLayout(visionTab);
-
-    // Создаем элементы управления
-    QHBoxLayout* controlLayout = new QHBoxLayout();
-    m_startVisionButton = new QPushButton("Start Vision System");
-    m_stopVisionButton = new QPushButton("Stop Vision System");
-    m_visionStatusLabel = new QLabel("Status: Stopped");
-
-    m_stopVisionButton->setEnabled(false);
-
-    controlLayout->addWidget(m_startVisionButton);
-    controlLayout->addWidget(m_stopVisionButton);
-    controlLayout->addWidget(m_visionStatusLabel);
-    controlLayout->addStretch();
-
-    m_visionResultsTextEdit = new QTextEdit();
-    m_visionResultsTextEdit->setReadOnly(true);
-    m_visionResultsTextEdit->setPlaceholderText("Vision system results will appear here...");
-
-    visionLayout->addLayout(controlLayout);
-    visionLayout->addWidget(m_visionResultsTextEdit);
-
-    // Добавляем вкладку в tabWidget
-    ui->tabWidget->addTab(visionTab, "Computer Vision");
-
-    // Подключаем кнопки
-    connect(m_startVisionButton, &QPushButton::clicked, this, &MainWindow::onStartVisionClicked);
-    connect(m_stopVisionButton, &QPushButton::clicked, this, &MainWindow::onStopVisionClicked);
 }

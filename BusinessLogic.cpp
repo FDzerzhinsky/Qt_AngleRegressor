@@ -2,17 +2,17 @@
 #include "VisionSystemManager.h"
 #include <QFileInfo>
 #include <QDir>
+#include <QDebug>
 
-BusinessLogic::BusinessLogic(QObject* parent)
+BusinessLogic::BusinessLogic(QObject * parent)
     : QObject(parent)
     , m_tcpSocket(new QTcpSocket(this))
-    , m_visionManager(nullptr)
+    , m_visionManager(new VisionSystemManager())
     , m_visionThread(new QThread(this))
 {
     setupSocketConnections();
 
     // Инициализация системы компьютерного зрения
-    m_visionManager = new VisionSystemManager();
     m_visionManager->moveToThread(m_visionThread);
 
     // Подключаем сигналы системы компьютерного зрения
@@ -39,7 +39,7 @@ BusinessLogic::~BusinessLogic()
 {
     // Останавливаем систему компьютерного зрения
     if (m_visionManager) {
-        m_visionManager->stopVisionSystem();
+        QMetaObject::invokeMethod(m_visionManager, "stopVisionSystem", Qt::BlockingQueuedConnection);
     }
 
     if (m_visionThread && m_visionThread->isRunning()) {
@@ -156,13 +156,32 @@ void BusinessLogic::clearImage()
 
 void BusinessLogic::startVisionSystem()
 {
-    QMetaObject::invokeMethod(m_visionManager, "startVisionSystem");
+    qDebug() << "BusinessLogic::startVisionSystem() - Sending start command to vision manager";
+
+    if (!m_visionManager) {
+        qDebug() << "BusinessLogic::startVisionSystem() - Vision manager is null!";
+        emit logMessage("Error: Vision manager is not initialized");
+        return;
+    }
+
+    if (!m_visionThread->isRunning()) {
+        qDebug() << "BusinessLogic::startVisionSystem() - Vision thread is not running!";
+        emit logMessage("Error: Vision thread is not running");
+        return;
+    }
+
+    // ВАЖНО: Используем прямой вызов через QMetaObject::invokeMethod
+    // с правильным указанием типа соединения
+    bool result = QMetaObject::invokeMethod(m_visionManager, "startVisionSystem", Qt::QueuedConnection);
+    qDebug() << "BusinessLogic::startVisionSystem() - Invoke method result:" << result;
+
     emit logMessage("Starting vision system...");
 }
 
 void BusinessLogic::stopVisionSystem()
 {
-    QMetaObject::invokeMethod(m_visionManager, "stopVisionSystem");
+    qDebug() << "BusinessLogic::stopVisionSystem() - Sending stop command to vision manager";
+    QMetaObject::invokeMethod(m_visionManager, "stopVisionSystem", Qt::QueuedConnection);
     emit logMessage("Stopping vision system...");
 }
 
