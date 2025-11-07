@@ -63,3 +63,21 @@ CameraConfig read_camera_config(const std::string& filename = "config.ini");
 
 // Генерация имени снэпшота на основе текущего времени
 std::string generateSnapshotName();
+
+// Инициализация камеры
+CameraState* InitCamera();
+
+// Деинициализация камеры
+void DeinitCamera(CameraState* state);
+
+// Запуск захвата видео
+int StartGrabbing(CameraState* state);
+
+// Остановка захвата видео
+int StopGrabbing(CameraState* state);
+
+// Callback-функция для обработки захваченных изображений
+void __stdcall ImageCallbackEx(unsigned char* pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser);
+
+// Функция ожидания нажатия клавиши
+void WaitForKeyPress(void) noexcept;

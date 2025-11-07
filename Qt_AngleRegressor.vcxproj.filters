@@ -80,5 +80,8 @@
     <ClInclude Include="capture.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="platform_utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

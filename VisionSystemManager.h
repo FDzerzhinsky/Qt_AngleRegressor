@@ -5,6 +5,7 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <thread>
 
 struct AngleContext;
 struct CallbackContext;
@@ -36,7 +37,7 @@ private:
 
     std::unique_ptr<AngleContext> m_angleContext;
     std::unique_ptr<CallbackContext> m_callbackContext;
-    std::unique_ptr<CameraState> m_cameraState;
+    CameraState* m_cameraState;  // Изменено на сырой указатель
 
     std::atomic<bool> m_visionRunning{ false };
     std::thread m_visionThread;

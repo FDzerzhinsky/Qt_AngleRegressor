@@ -15,6 +15,7 @@ using namespace std::chrono_literals;
 VisionSystemManager::VisionSystemManager(QObject* parent)
     : QObject(parent)
     , m_visionRunning(false)
+    , m_cameraState(nullptr)  // Инициализируем nullptr
 {
     qDebug() << "VisionSystemManager created";
 }
@@ -71,6 +72,11 @@ void VisionSystemManager::stopVisionSystem()
     qDebug() << "Stopping vision system...";
     m_visionRunning = false;
 
+    // Устанавливаем флаг остановки в callback контексте
+    if (m_callbackContext) {
+        m_callbackContext->stop = true;
+    }
+
     if (m_visionThread.joinable()) {
         m_visionThread.join();
         qDebug() << "Vision thread joined";
@@ -102,7 +108,32 @@ void VisionSystemManager::initializeVisionSystem()
             throw std::runtime_error("Failed to create angle context");
         }
 
+        // Создаем контекст для callback-функции
+        m_callbackContext = std::make_unique<CallbackContext>();
+        m_callbackContext->angle_context = m_angleContext.get();
+        m_callbackContext->stop = false;
+
         m_angleContext->save_snapshots = false;
+
+        // Инициализируем камеру
+        qDebug() << "Initializing camera...";
+        m_cameraState = InitCamera();  // Прямое присваивание
+        if (!m_cameraState) {
+            throw std::runtime_error("Failed to initialize camera");
+        }
+
+        m_callbackContext->cameraState = m_cameraState;
+
+        // Регистрируем callback-функцию
+        int nRet = MV_CC_RegisterImageCallBackEx(m_cameraState->handle, ImageCallbackEx, m_callbackContext.get());
+        if (nRet != MV_OK) {
+            throw std::runtime_error("Failed to register image callback");
+        }
+
+        // Запускаем захват видео
+        if (StartGrabbing(m_cameraState) != MV_OK) {
+            throw std::runtime_error("Failed to start grabbing");
+        }
 
         emit visionLogMessage("Vision system initialized successfully");
         qDebug() << "Vision system initialized successfully";
@@ -111,6 +142,9 @@ void VisionSystemManager::initializeVisionSystem()
     catch (const std::exception& e) {
         QString errorMsg = QString("Vision system initialization failed: %1").arg(e.what());
         qDebug() << errorMsg;
+
+        // Очищаем ресурсы при ошибке инициализации
+        cleanupVisionSystem();
         throw std::runtime_error(errorMsg.toStdString());
     }
 }
@@ -119,10 +153,26 @@ void VisionSystemManager::cleanupVisionSystem()
 {
     qDebug() << "Cleaning up vision system resources";
 
+    // Останавливаем захват и деинициализируем камеру
+    if (m_cameraState) {
+        // Дерегистрируем callback-функцию
+        if (m_cameraState->handle) {
+            MV_CC_RegisterImageCallBackEx(m_cameraState->handle, NULL, NULL);
+        }
+
+        // Останавливаем захват если он активен
+        if (m_cameraState->grabbingStarted) {
+            StopGrabbing(m_cameraState);
+        }
+
+        // Деинициализируем камеру
+        DeinitCamera(m_cameraState);
+        m_cameraState = nullptr;
+    }
+
     // Очистка ресурсов компьютерного зрения
     m_angleContext.reset();
     m_callbackContext.reset();
-    m_cameraState.reset();
 
     qDebug() << "Vision system resources cleaned up";
 }
@@ -133,7 +183,7 @@ void VisionSystemManager::visionMainLoop()
     qDebug() << "Vision system main loop started";
 
     try {
-        // Основной цикл обработки из main.cpp проекта компьютерного зрения
+        // Основной цикл обработки
         while (m_visionRunning) {
             cv::Mat frame_to_process;
             std::string snapshot_name;
@@ -158,25 +208,31 @@ void VisionSystemManager::visionMainLoop()
                 if (process_frame(*m_angleContext, frame_to_process)) {
                     // Успешная обработка - отправляем результат
                     QString qSnapshotName = QString::fromStdString(snapshot_name);
+                    int x_position = m_angleContext->x_position;
+                    double total_time = m_angleContext->total_time;
 
                     // Используем invokeMethod для thread-safe вызова сигнала
-                    QMetaObject::invokeMethod(this, [this, qSnapshotName]() {
-                        emit visionResultReady(qSnapshotName,
-                            m_angleContext->x_position,
-                            m_angleContext->total_time);
+                    QMetaObject::invokeMethod(this, [this, qSnapshotName, x_position, total_time]() {
+                        emit visionResultReady(qSnapshotName, x_position, total_time);
                         });
 
                     // Логируем результат
                     QString logMessage = QString("Frame processed: X=%1, Time=%2ms")
-                        .arg(m_angleContext->x_position)
-                        .arg(m_angleContext->total_time, 0, 'f', 2);
+                        .arg(x_position)
+                        .arg(total_time, 0, 'f', 2);
                     emit visionLogMessage(logMessage);
                     qDebug() << logMessage;
 
                 }
                 else {
                     emit visionLogMessage("Frame processing failed");
-                    qDebug() << "Frame processing failed";
+                    qDebug() << "Frame processing failed!";
+
+                    // Отправляем сообщение об ошибке
+                    QString qSnapshotName = QString::fromStdString(snapshot_name);
+                    QMetaObject::invokeMethod(this, [this, qSnapshotName]() {
+                        emit visionResultReady(qSnapshotName, -1, 0.0);
+                        });
                 }
             }
 

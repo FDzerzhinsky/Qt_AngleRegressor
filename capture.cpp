@@ -1,22 +1,14 @@
 ﻿// =============================================================================
 // ВКЛЮЧЕНИЕ БИБЛИОТЕК
 // =============================================================================
-// Сначала стандартные библиотеки C
-#include <stdio.h>
-#include <ctime>
+#include "capture.h"
+#include "platform_utils.h"
 
-// Затем OpenCV
-#include <opencv2/opencv.hpp>
+#include <stdio.h>
 #include <chrono>
 #include <thread>
 
-// Наши заголовки
-#include "capture.h"
-#include "angle.h"
-#include "platform_utils.h"
-
 using namespace std;
-using namespace cv;
 using namespace chrono;
 
 // =============================================================================
@@ -34,7 +26,7 @@ void WaitForKeyPress(void) noexcept {
 // ЧТЕНИЕ КОНФИГУРАЦИИ КАМЕРЫ ИЗ ФАЙЛА
 // =============================================================================
 // Эта функция читает параметры камеры из конфигурационного файла
-// Позволяет настраивать подключение к камере без перекомпиляции кода
+// Позволяет настраивать подключение к камеры без перекомпиляции кода
 CameraConfig read_camera_config(const std::string& filename) {
     // Значения по умолчанию на случай отсутствия файла конфигурации
     CameraConfig config = { "192.168.1.100", "192.168.1.101", 0 };
@@ -91,7 +83,7 @@ CameraConfig read_camera_config(const std::string& filename) {
 unsigned int ParseIpAddress(const string& ipStr) {
     unsigned int nIp1, nIp2, nIp3, nIp4;
     // Парсим строку IP-адреса на составляющие
-    sscanf_s(ipStr.c_str(), "%d.%d.%d.%d", &nIp1, &nIp2, &nIp3, &nIp4);
+    sscanf(ipStr.c_str(), "%d.%d.%d.%d", &nIp1, &nIp2, &nIp3, &nIp4);
     // Формируем 32-битное представление IP-адреса
     return (nIp1 << 24) | (nIp2 << 16) | (nIp3 << 8) | nIp4;
 }
@@ -511,7 +503,7 @@ void __stdcall ImageCallbackEx(unsigned char* pData, MV_FRAME_OUT_INFO_EX* pFram
 
                 // Формируем имя файла на основе номера кадра
                 char filename[50];
-                sprintf_s(filename, "snaps/snapshot_%d.png", ctx->count.load());
+                snprintf(filename, sizeof(filename), "snaps/snapshot_%d.png", ctx->count.load());
 
                 // Сохраняем изображение в файл (это операция ввода-вывода, может быть медленной)
                 cv::imwrite(filename, frame);
@@ -529,82 +521,4 @@ void __stdcall ImageCallbackEx(unsigned char* pData, MV_FRAME_OUT_INFO_EX* pFram
             printf("Convert pixel type failed! nRet [0x%x]\n", nRet);
         }
     }
-}
-
-// =============================================================================
-// ОСНОВНАЯ ФУНКЦИЯ ЗАХВАТА КАДРОВ
-// =============================================================================
-// Эта функция инициализирует камеру, настраивает callback-обработчик
-// и управляет процессом захвата изображений по внешнему триггеру
-int capture(AngleContext& angle_context) {
-    // Инициализация камеры - настройка подключения и параметров
-    CameraState* camera = InitCamera();
-    if (!camera) {
-        printf("Camera initialization failed!\n");
-        WaitForKeyPress();
-        return -1;
-    }
-
-    // Создание контекста для callback-функции
-    // Этот контекст будет передаваться в callback и содержать все необходимые данные
-    CallbackContext context;
-    context.angle_context = &angle_context;  // Ссылка на основной контекст обработки
-    context.cameraState = camera;            // Состояние камеры
-    context.count = 0;                       // Счетчик захваченных кадров
-    context.stop = false;                    // Флаг остановки захвата
-
-    // Регистрация callback-функции для обработки захваченных изображений
-    // Callback будет вызываться автоматически при получении нового кадра с камеры
-    int nRet = MV_CC_RegisterImageCallBackEx(camera->handle, ImageCallbackEx, &context);
-    if (nRet != MV_OK) {
-        printf("Register Image CallBack fail! nRet [0x%x]\n", nRet);
-        DeinitCamera(camera);
-        WaitForKeyPress();
-        return -1;
-    }
-
-    // Запуск захвата видео - камера начинает ожидать внешние триггеры
-    if (StartGrabbing(camera) != MV_OK) {
-        printf("Failed to start grabbing!\n");
-        DeinitCamera(camera);
-        WaitForKeyPress();
-        return -1;
-    }
-
-    printf("Waiting for hardware triggers...\n");
-    printf("Press ESC to stop capturing\n");
-
-    // =========================================================================
-    // ОСНОВНОЙ ЦИКЛ ОЖИДАНИЯ
-    // =========================================================================
-    // Программа работает пока не будет достигнут лимит кадров или не будет нажата клавиша ESC
-    // Если max_captures = 0, то ограничения на количество кадров нет
-    while (camera->config.max_captures == 0 || context.count < camera->config.max_captures) {
-        // Упрощенная проверка ESC - просто ждем некоторое время
-        PlatformUtils::Sleep(100);
-
-        // Для отладки - выходим после 10 кадров
-        if (context.count >= 10) {
-            printf("Reached 10 captures, stopping...\n");
-            context.stop = true;
-            break;
-        }
-    }
-
-    // Корректное завершение работы - останавливаем захват и освобождаем ресурсы
-    StopGrabbing(camera);
-
-    // Дерегистрация callback-функции - важно для избежания обращений к освобожденной памяти
-    MV_CC_RegisterImageCallBackEx(camera->handle, NULL, NULL);
-
-    // Деинициализация камеры - освобождение всех ресурсов, связанных с камеряой
-    DeinitCamera(camera);
-
-    // Закрываем все открытые окна OpenCV (если такие есть)
-    cv::destroyAllWindows();
-
-    printf("Capture completed. Captured %d images. Press any key to exit...\n", context.count.load());
-    WaitForKeyPress();
-
-    return 0;
 }
