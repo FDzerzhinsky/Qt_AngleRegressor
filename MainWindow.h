@@ -1,3 +1,4 @@
+// [file name]: MainWindow.h
 #pragma once
 
 #include <QMainWindow>
@@ -53,6 +54,7 @@ private slots:
     void onStartVisionClicked();
     void onStopVisionClicked();
     void onVisionResultReceived(const QString& snapshotName, int xPosition, double totalTime);
+    void onVisionResultReceivedForDisplay(const QString& displayMessage);  // мнбши якнр дкъ нрнапюфемхъ пегскэрюрнб
     void onVisionSystemError(const QString& error);
 
 private:

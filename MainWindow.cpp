@@ -1,4 +1,5 @@
-﻿#include "MainWindow.h"
+﻿// [file name]: MainWindow.cpp
+#include "MainWindow.h"
 #include "ui_MainWindow.h"
 #include "BusinessLogic.h"
 #include "CropDialog.h"
@@ -19,7 +20,7 @@
 #include <QTextEdit>
 #include <QDebug>
 
-MainWindow::MainWindow(QWidget * parent)
+MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , m_businessLogic(new BusinessLogic)
@@ -41,10 +42,15 @@ MainWindow::MainWindow(QWidget * parent)
 
     // ==================== НАСТРОЙКА ПОТОКА ДЛЯ БИЗНЕС-ЛОГИКИ ====================
     m_businessLogic->moveToThread(m_businessThread);
-    m_businessThread->start();
 
     // ==================== НАСТРОЙКА СОЕДИНЕНИЙ СИГНАЛОВ И СЛОТОВ ====================
     setupConnections();
+
+    // ЗАПУСКАЕМ ПОТОК БИЗНЕС-ЛОГИКИ
+    m_businessThread->start();
+
+    // ВЫЗЫВАЕМ ИНИЦИАЛИЗАЦИЮ БИЗНЕС-ЛОГИКИ В ЕЕ ПОТОКЕ
+    QMetaObject::invokeMethod(m_businessLogic, "initialize", Qt::QueuedConnection);
 
     // ==================== ИНИЦИАЛИЗАЦИЯ СОСТОЯНИЯ ИНТЕРФЕЙСА ====================
     updateSendButtonState();
@@ -149,6 +155,11 @@ void MainWindow::setupConnections()
     connect(ui->startVisionButton, &QPushButton::clicked, this, &MainWindow::onStartVisionClicked);
     connect(ui->stopVisionButton, &QPushButton::clicked, this, &MainWindow::onStopVisionClicked);
 
+    // =============================================================================
+    // НОВОЕ СОЕДИНЕНИЕ ДЛЯ ЧЕКБОКСА СОХРАНЕНИЯ СНЭПШОТОВ
+    // =============================================================================
+    connect(ui->saveSnapsCheckBox, &QCheckBox::toggled, m_businessLogic, &BusinessLogic::setSaveSnapshots);
+
     // ==================== СОЕДИНЕНИЯ С БИЗНЕС-ЛОГИКОЙ ====================
     // Сигналы от бизнес-логики к GUI (межпоточные соединения)
     connect(m_businessLogic, &BusinessLogic::logMessage, this, &MainWindow::onLogMessage);
@@ -161,6 +172,13 @@ void MainWindow::setupConnections()
     // ==================== СОЕДИНЕНИЯ С БИЗНЕС-ЛОГИКОЙ ДЛЯ КОМПЬЮТЕРНОГО ЗРЕНИЯ ====================
     connect(m_businessLogic, &BusinessLogic::visionResultReceived,
         this, &MainWindow::onVisionResultReceived);
+
+    // =============================================================================
+    // НОВОЕ СОЕДИНЕНИЕ ДЛЯ ОТОБРАЖЕНИЯ РЕЗУЛЬТАТОВ ОБРАБОТКИ В GUI
+    // =============================================================================
+    connect(m_businessLogic, &BusinessLogic::visionResultReceivedForDisplay,
+        this, &MainWindow::onVisionResultReceivedForDisplay);
+
     connect(m_businessLogic, &BusinessLogic::visionSystemError,
         this, &MainWindow::onVisionSystemError);
 }
@@ -285,12 +303,19 @@ void MainWindow::onStopVisionClicked()
 
 void MainWindow::onVisionResultReceived(const QString& snapshotName, int xPosition, double totalTime)
 {
-    QString result = QString("[%1] X Position: %2, Processing Time: %3 ms")
-        .arg(snapshotName)
-        .arg(xPosition)
-        .arg(totalTime, 0, 'f', 2);
+    // Этот слот теперь не используется для отображения в GUI
+    // Вместо него используется visionResultReceivedForDisplay
+    Q_UNUSED(snapshotName)
+        Q_UNUSED(xPosition)
+        Q_UNUSED(totalTime)
+}
 
-    ui->visionResultsTextEdit->append(result);
+// =============================================================================
+// НОВЫЙ СЛОТ ДЛЯ ОТОБРАЖЕНИЯ РЕЗУЛЬТАТОВ ОБРАБОТКИ В GUI
+// =============================================================================
+void MainWindow::onVisionResultReceivedForDisplay(const QString& displayMessage)
+{
+    ui->visionResultsTextEdit->append(displayMessage);
 }
 
 void MainWindow::onVisionSystemError(const QString& error)
@@ -396,7 +421,7 @@ void MainWindow::updateSendButtonState()
 
 void MainWindow::updateImageButtonsState()
 {
-    // Кнопки обработки и очистки активны только при загруженном изображении
+    // Кнопки обработки и очистки активны только при загруженным изображении
     bool hasImage = !ui->imagePathLabel->text().isEmpty() &&
         ui->imagePathLabel->text() != "No file selected";
     ui->processImageButton->setEnabled(hasImage);

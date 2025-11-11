@@ -1,3 +1,4 @@
+// [file name]: BusinessLogic.h
 #pragma once
 
 #include <QObject>
@@ -35,6 +36,10 @@ public slots:
     void startVisionSystem();
     void stopVisionSystem();
     void sendVisionResult(const QString& snapshotName, int xPosition, double totalTime);
+    void setSaveSnapshots(bool save);
+
+    // ==================== »Õ»÷»¿À»«¿÷»ﬂ ====================
+    void initialize();  // ÕŒ¬€… —ÀŒ“ ƒÀﬂ »Õ»÷»¿À»«¿÷»» ¬ œ–¿¬»À‹ÕŒÃ œŒ“Œ ≈
 
 signals:
     // ==================== —»√Õ¿À€ ƒÀﬂ GUI ====================
@@ -47,6 +52,7 @@ signals:
 
     // ==================== —»√Õ¿À€  ŒÃœ‹ﬁ“≈–ÕŒ√Œ «–≈Õ»ﬂ ====================
     void visionResultReceived(const QString& snapshotName, int xPosition, double totalTime);
+    void visionResultReceivedForDisplay(const QString& displayMessage);
     void visionSystemError(const QString& error);
     void visionStatusChanged(bool running);
 

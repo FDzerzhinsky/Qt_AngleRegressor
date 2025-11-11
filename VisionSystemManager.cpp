@@ -1,3 +1,4 @@
+// [file name]: VisionSystemManager.cpp
 // =============================================================================
 // ВКЛЮЧЕНИЕ БИБЛИОТЕК
 // =============================================================================
@@ -7,15 +8,19 @@
 
 #include <QDebug>
 #include <QMetaObject>
+#include <QDir>
+#include <QImage>
+#include <QDateTime>
 #include <chrono>
 #include <thread>
+#include <future>
 
 using namespace std::chrono_literals;
 
 VisionSystemManager::VisionSystemManager(QObject* parent)
     : QObject(parent)
     , m_visionRunning(false)
-    , m_cameraState(nullptr)  // Инициализируем nullptr
+    , m_cameraState(nullptr)
 {
     qDebug() << "VisionSystemManager created";
 }
@@ -23,6 +28,22 @@ VisionSystemManager::VisionSystemManager(QObject* parent)
 VisionSystemManager::~VisionSystemManager()
 {
     stopVisionSystem();
+}
+
+// =============================================================================
+// НОВАЯ ФУНКЦИЯ ДЛЯ ГЕНЕРАЦИИ УНИКАЛЬНОГО ИМЕНИ СНЭПШОТА
+// =============================================================================
+QString VisionSystemManager::generateSnapshotName()
+{
+    // Получаем текущее время с точностью до секунды
+    QDateTime currentTime = QDateTime::currentDateTime();
+
+    // Форматируем время в строку: "snap_год-месяц-день_час-минута-секунда"
+    // Используем дефисы вместо точек и двоеточий для совместимости с файловыми системами
+    QString timestamp = currentTime.toString("yyyy-MM-dd_hh-mm-ss");
+
+    // Добавляем префикс и возвращаем
+    return QString("snap_%1").arg(timestamp);
 }
 
 void VisionSystemManager::startVisionSystem()
@@ -97,6 +118,159 @@ void VisionSystemManager::configureVisionSystem(bool saveSnapshots)
     }
 }
 
+// =============================================================================
+// НОВЫЙ МЕТОД ДЛЯ УСТАНОВКИ ФЛАГА СОХРАНЕНИЯ СНЭПШОТОВ
+// =============================================================================
+void VisionSystemManager::setSaveSnapshots(bool save)
+{
+    m_saveSnapshots.store(save, std::memory_order_release);
+
+    if (save) {
+        emit visionLogMessage("Snapshot saving enabled - snapshots will be saved to /snaps directory");
+        qDebug() << "Snapshot saving enabled";
+    }
+    else {
+        emit visionLogMessage("Snapshot saving disabled");
+        qDebug() << "Snapshot saving disabled";
+    }
+}
+
+// =============================================================================
+// НОВЫЙ МЕТОД ДЛЯ АСИНХРОННОГО СОХРАНЕНИЯ СНЭПШОТОВ
+// =============================================================================
+void VisionSystemManager::saveSnapshotAsync(const cv::Mat& frame, const QString& snapshotName)
+{
+    // =========================================================================
+    // ПРЕОБРАЗОВАНИЕ OPENCV MAT В QIMAGE ДЛЯ БЕЗОПАСНОГО СОХРАНЕНИЯ
+    // =========================================================================
+    // Вместо работы с cv::Mat в отдельном потоке, преобразуем в QImage
+    // который безопасно управляет памятью и может быть передан между потоками
+
+    QImage image;
+    try {
+        // Проверяем валидность входного кадра
+        if (frame.empty() || frame.cols == 0 || frame.rows == 0 || frame.data == nullptr) {
+            qWarning() << "Invalid frame for snapshot:" << snapshotName;
+            QMetaObject::invokeMethod(this, [this, snapshotName]() {
+                emit visionLogMessage(QString("Invalid frame for snapshot %1").arg(snapshotName));
+                });
+            return;
+        }
+
+        // Преобразуем BGR OpenCV в RGB QImage
+        cv::Mat rgbFrame;
+        cv::cvtColor(frame, rgbFrame, cv::COLOR_BGR2RGB);
+
+        // Создаем QImage из данных OpenCV
+        image = QImage(rgbFrame.data, rgbFrame.cols, rgbFrame.rows,
+            rgbFrame.step, QImage::Format_RGB888).copy();
+
+        // Проверяем, что преобразование прошло успешно
+        if (image.isNull()) {
+            qWarning() << "Failed to convert OpenCV frame to QImage for snapshot:" << snapshotName;
+            QMetaObject::invokeMethod(this, [this, snapshotName]() {
+                emit visionLogMessage(QString("Failed to convert frame for snapshot %1").arg(snapshotName));
+                });
+            return;
+        }
+    }
+    catch (const std::exception& e) {
+        qWarning() << "Exception during frame conversion:" << e.what();
+        QMetaObject::invokeMethod(this, [this, snapshotName, e]() {
+            emit visionLogMessage(QString("Frame conversion error for %1: %2").arg(snapshotName).arg(e.what()));
+            });
+        return;
+    }
+
+    // =========================================================================
+    // ГЕНЕРАЦИЯ УНИКАЛЬНОГО ИМЕНИ ФАЙЛА ДЛЯ КАЖДОГО СНЭПШОТА
+    // =========================================================================
+    QString uniqueSnapshotName = generateSnapshotName();
+    qDebug() << "Generated snapshot name:" << uniqueSnapshotName;
+
+    // =========================================================================
+    // ИСПОЛЬЗОВАНИЕ STD::ASYNC ДЛЯ АСИНХРОННОГО СОХРАНЕНИЯ ЧЕРЕЗ QT
+    // =========================================================================
+    // Захватываем QImage по значению - он безопасно копируется между потоками
+    auto saveTask = [this, image, uniqueSnapshotName]() {
+        try {
+            // =================================================================
+            // СОЗДАНИЕ ДИРЕКТОРИИ SNAPS ЕСЛИ ОНА НЕ СУЩЕСТВУЕТ
+            // =================================================================
+            QDir snapsDir("snaps");
+            if (!snapsDir.exists()) {
+                if (snapsDir.mkpath(".")) {
+                    qDebug() << "Created snaps directory";
+                }
+                else {
+                    qWarning() << "Failed to create snaps directory";
+                    QMetaObject::invokeMethod(this, [this, uniqueSnapshotName]() {
+                        emit visionLogMessage(QString("Failed to create snaps directory for %1").arg(uniqueSnapshotName));
+                        });
+                    return;
+                }
+            }
+
+            // =================================================================
+            // ФОРМИРОВАНИЕ ПУТИ К ФАЙЛУ И СОХРАНЕНИЕ ЧЕРЕЗ QT
+            // =================================================================
+            QString filePath = snapsDir.filePath(uniqueSnapshotName + ".png");
+
+            // Дополнительная проверка валидности QImage перед сохранением
+            if (image.isNull() || image.width() == 0 || image.height() == 0) {
+                qWarning() << "Invalid QImage for snapshot:" << uniqueSnapshotName;
+                QMetaObject::invokeMethod(this, [this, uniqueSnapshotName]() {
+                    emit visionLogMessage(QString("Invalid QImage for snapshot %1").arg(uniqueSnapshotName));
+                    });
+                return;
+            }
+
+            // Сохраняем изображение с помощью Qt - это безопаснее чем OpenCV в многопоточности
+            bool saveResult = false;
+            try {
+                saveResult = image.save(filePath, "PNG");
+            }
+            catch (const std::exception& e) {
+                qWarning() << "Qt exception during snapshot save:" << e.what();
+                QMetaObject::invokeMethod(this, [this, uniqueSnapshotName, e]() {
+                    emit visionLogMessage(QString("Qt error saving %1: %2").arg(uniqueSnapshotName).arg(e.what()));
+                    });
+                return;
+            }
+
+            if (saveResult) {
+                qDebug() << "Snapshot saved:" << filePath;
+                QMetaObject::invokeMethod(this, [this, uniqueSnapshotName]() {
+                    emit visionLogMessage(QString("Snapshot saved: %1").arg(uniqueSnapshotName));
+                    });
+            }
+            else {
+                qWarning() << "Failed to save snapshot:" << filePath;
+                QMetaObject::invokeMethod(this, [this, uniqueSnapshotName]() {
+                    emit visionLogMessage(QString("Failed to save snapshot: %1").arg(uniqueSnapshotName));
+                    });
+            }
+        }
+        catch (const std::exception& e) {
+            qWarning() << "Exception in snapshot saving:" << e.what();
+            QMetaObject::invokeMethod(this, [this, uniqueSnapshotName, e]() {
+                emit visionLogMessage(QString("Snapshot save error for %1: %2").arg(uniqueSnapshotName).arg(e.what()));
+                });
+        }
+        };
+
+    // Запускаем асинхронную задачу
+    try {
+        std::async(std::launch::async, saveTask);
+    }
+    catch (const std::exception& e) {
+        qWarning() << "Failed to start async snapshot save:" << e.what();
+        QMetaObject::invokeMethod(this, [this, uniqueSnapshotName]() {
+            emit visionLogMessage(QString("Failed to start snapshot save for %1").arg(uniqueSnapshotName));
+            });
+    }
+}
+
 void VisionSystemManager::initializeVisionSystem()
 {
     try {
@@ -117,7 +291,7 @@ void VisionSystemManager::initializeVisionSystem()
 
         // Инициализируем камеру
         qDebug() << "Initializing camera...";
-        m_cameraState = InitCamera();  // Прямое присваивание
+        m_cameraState = InitCamera();
         if (!m_cameraState) {
             throw std::runtime_error("Failed to initialize camera");
         }
@@ -205,6 +379,23 @@ void VisionSystemManager::visionMainLoop()
             // Обработка кадра
             if (has_new_frame && m_angleContext) {
                 qDebug() << "Processing frame...";
+
+                // =========================================================================
+                // СОХРАНЕНИЕ СНЭПШОТА ЕСЛИ ВКЛЮЧЕНО
+                // =========================================================================
+                if (m_saveSnapshots.load(std::memory_order_acquire)) {
+                    // Проверяем валидность кадра перед сохранением
+                    if (!frame_to_process.empty() && frame_to_process.data != nullptr) {
+                        // Используем нашу функцию для генерации уникального имени
+                        QString qSnapshotName = generateSnapshotName();
+                        qDebug() << "Saving snapshot:" << qSnapshotName;
+                        saveSnapshotAsync(frame_to_process, qSnapshotName);
+                    }
+                    else {
+                        qWarning() << "Invalid frame for snapshot saving - empty or null data";
+                    }
+                }
+
                 if (process_frame(*m_angleContext, frame_to_process)) {
                     // Успешная обработка - отправляем результат
                     QString qSnapshotName = QString::fromStdString(snapshot_name);
