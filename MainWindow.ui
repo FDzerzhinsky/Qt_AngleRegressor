@@ -18,7 +18,7 @@
     <item>
      <widget class="QTabWidget" name="tabWidget">
       <property name="currentIndex">
-       <number>3</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="socketTab">
        <attribute name="title">
@@ -41,7 +41,7 @@
            <item>
             <widget class="QLineEdit" name="ipLineEdit">
              <property name="text">
-              <string>127.0.0.1</string>
+              <string>192.168.101.101</string>
              </property>
             </widget>
            </item>
@@ -61,7 +61,7 @@
               <number>65535</number>
              </property>
              <property name="value">
-              <number>12345</number>
+              <number>1001</number>
              </property>
             </widget>
            </item>

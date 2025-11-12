@@ -170,7 +170,7 @@ void BusinessLogic::processImage(const QPixmap& croppedImage, const QString& fil
     QString filePath = netsurfacesDir.filePath(finalFileName);
 
     // Save the cropped image
-    if (croppedImage.save(filePath, "PNG")) {
+    if (croppedImage.save(filePath, "PNG", 100)) {
         emit logMessage(QString("Image saved as: %1").arg(finalFileName));
         emit imageProcessed();
     }
