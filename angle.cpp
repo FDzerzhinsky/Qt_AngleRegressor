@@ -21,10 +21,20 @@ ImageProcessingConfig read_image_processing_config(const std::string& filename) 
     ifstream file(filename);
     if (file.is_open()) {
         string line;
+        string current_section = "";
         // Читаем файл построчно
         while (getline(file, line)) {
             // Пропускаем пустые строки и комментарии
             if (line.empty() || line[0] == '#') continue;
+
+            // Проверяем, является ли строка секцией
+            if (line[0] == '[' && line[line.length() - 1] == ']') {
+                current_section = line.substr(1, line.length() - 2);
+                continue;
+            }
+
+            // Обрабатываем только секцию ImageProcessing
+            if (current_section != "ImageProcessing") continue;
 
             // Используем stringstream для разбора строки
             istringstream iss(line);
@@ -40,7 +50,8 @@ ImageProcessingConfig read_image_processing_config(const std::string& filename) 
                 // Записываем значения в конфигурацию в зависимости от ключа
                 // Используем блоки try-catch для обработки ошибок преобразования типов
                 try {
-                    if (key == "ref_image_scale") config.ref_image_scale = stod(value);
+                    if (key == "ref_image_path") config.ref_image_path = value;
+                    else if (key == "ref_image_scale") config.ref_image_scale = stod(value);
                     else if (key == "orb_max_features") config.orb_max_features = stoi(value);
                     else if (key == "orb_scale_factor") config.orb_scale_factor = stod(value);
                     else if (key == "orb_n_levels") config.orb_n_levels = stoi(value);
@@ -54,6 +65,7 @@ ImageProcessingConfig read_image_processing_config(const std::string& filename) 
                     else if (key == "good_match_ratio") config.good_match_ratio = stod(value);
                     else if (key == "min_good_matches") config.min_good_matches = stoi(value);
                     else if (key == "ransac_threshold") config.ransac_threshold = stod(value);
+                    else if (key == "save_snapshots") config.save_snapshots = (value == "true" || value == "1");
                 }
                 catch (const exception& e) {
                     // Выводим ошибку, но продолжаем работу с остальными параметрами
@@ -85,6 +97,7 @@ void initialize_angle_processing(AngleContext& context) {
 
     // Вывод загруженных параметров для отладки
     cout << "Image processing configuration loaded:" << endl;
+    cout << "  ref_image_path: " << context.config.ref_image_path << endl;
     cout << "  ref_image_scale: " << context.config.ref_image_scale << endl;
     cout << "  orb_max_features: " << context.config.orb_max_features << endl;
     cout << "  orb_scale_factor: " << context.config.orb_scale_factor << endl;
@@ -95,11 +108,12 @@ void initialize_angle_processing(AngleContext& context) {
     cout << "  good_match_ratio: " << context.config.good_match_ratio << endl;
     cout << "  min_good_matches: " << context.config.min_good_matches << endl;
     cout << "  ransac_threshold: " << context.config.ransac_threshold << endl;
+    cout << "  save_snapshots: " << context.config.save_snapshots << endl;
 
-    // Загрузка референсного изображения
-    context.ref_image = imread("reference.png", IMREAD_COLOR);
+    // Загрузка референсного изображения из указанного пути
+    context.ref_image = imread(context.config.ref_image_path, IMREAD_COLOR);
     if (context.ref_image.empty()) {
-        throw runtime_error("Error: Reference image not found!");
+        throw runtime_error("Error: Reference image not found at path: " + context.config.ref_image_path);
     }
 
     // Уменьшение размера референсного изображения для ускорения обработки
@@ -146,6 +160,9 @@ void initialize_angle_processing(AngleContext& context) {
         // Для небинарных дескрипторов используем стандартный матчер
         context.flann = cv::FlannBasedMatcher::create();
     }
+
+    // Установка флага сохранения снэпшотов из конфигурации
+    context.save_snapshots = context.config.save_snapshots;
 }
 
 // =============================================================================
@@ -311,7 +328,7 @@ std::unique_ptr<AngleContext> create_angle_context() {
     auto context = std::make_unique<AngleContext>();
 
     // Инициализируем контекст обработки изображений
-    // Эта функция загружает референсное изображение и настраивает алгоритмы
+    // Эта функции загружает референсное изображение и настраивает алгоритмы
     initialize_angle_processing(*context);
 
     // Возвращаем умный указатель на инициализированный контекст

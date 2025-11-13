@@ -35,10 +35,20 @@ CameraConfig read_camera_config(const std::string& filename) {
     ifstream file(filename);
     if (file.is_open()) {
         string line;
+        string current_section = "";
         // Читаем файл построчно
         while (getline(file, line)) {
             // Пропускаем пустые строки и комментарии
             if (line.empty() || line[0] == '#') continue;
+
+            // Проверяем, является ли строка секцией
+            if (line[0] == '[' && line[line.length() - 1] == ']') {
+                current_section = line.substr(1, line.length() - 2);
+                continue;
+            }
+
+            // Обрабатываем только секцию Camera
+            if (current_section != "Camera") continue;
 
             // Используем stringstream для разбора строки
             istringstream iss(line);

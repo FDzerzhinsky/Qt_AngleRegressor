@@ -1,4 +1,4 @@
-﻿// [file name]: MainWindow.cpp
+﻿//  [file name]: MainWindow.cpp
 #include "MainWindow.h"
 #include "ui_MainWindow.h"
 #include "BusinessLogic.h"
@@ -87,16 +87,51 @@ MainWindow::~MainWindow()
 
 void MainWindow::initializeSettings()
 {
-    // Определяем путь к файлу настроек в папке с приложением
+    // =============================================================================
+    // ИНИЦИАЛИЗАЦИЯ УНИФИЦИРОВАННОГО КОНФИГУРАЦИОННОГО ФАЙЛА
+    // =============================================================================
+    // ОПРЕДЕЛЯЕМ ПУТЬ К ФАЙЛУ НАСТРОЕК В ПАПКЕ С ИСПОЛНЯЕМЫМ ФАЙЛОМ
+    // Это гарантирует, что конфиг всегда будет рядом с exe-файлом
     QString configPath = QApplication::applicationDirPath() + "/config.ini";
+    qDebug() << "Config file path:" << configPath;
 
-    // Явно создаем файл настроек, если его нет
+    // Явно создаем файл настроек с полной структурой, если его нет
     if (!QFile::exists(configPath)) {
         QFile configFile(configPath);
         if (configFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
             QTextStream out(&configFile);
             out << "[General]\n";
             out << "selectedPattern=\n";
+            out << "\n";
+            out << "[Camera]\n";
+            out << "camera_ip=192.168.101.10\n";
+            out << "host_ip=192.168.101.201\n";
+            out << "max_captures=0\n";
+            out << "\n";
+            out << "[ImageProcessing]\n";
+            // Автоматически выбираем первое изображение из netsurfaces если папка существует
+            QDir netsurfacesDir("netsurfaces");
+            QString refImagePath = "reference.png";
+            if (netsurfacesDir.exists() && !netsurfacesDir.entryList(QStringList() << "*.png" << "*.jpg" << "*.jpeg", QDir::Files).isEmpty()) {
+                QString firstImage = netsurfacesDir.entryList(QStringList() << "*.png" << "*.jpg" << "*.jpeg", QDir::Files).first();
+                refImagePath = "netsurfaces/" + firstImage;
+            }
+            out << "ref_image_path=" << refImagePath << "\n";
+            out << "ref_image_scale=0.5\n";
+            out << "orb_max_features=500\n";
+            out << "orb_scale_factor=1.2\n";
+            out << "orb_n_levels=4\n";
+            out << "orb_edge_threshold=20\n";
+            out << "orb_first_level=0\n";
+            out << "orb_wta_k=2\n";
+            out << "orb_score_type=1\n";
+            out << "orb_patch_size=31\n";
+            out << "orb_fast_threshold=20\n";
+            out << "flann_search_params=10\n";
+            out << "good_match_ratio=0.65\n";
+            out << "min_good_matches=5\n";
+            out << "ransac_threshold=3.0\n";
+            out << "save_snapshots=false\n";
             configFile.close();
             qDebug() << "Config file created at:" << configPath;
         }
@@ -105,15 +140,84 @@ void MainWindow::initializeSettings()
         }
     }
     else {
-        // Файл уже существует - проверяем его структуру
+        // Файл уже существует - проверяем и дополняем его структуру
         QSettings tempSettings(configPath, QSettings::IniFormat);
 
         // Если нет ключа selectedPattern - добавляем его
-        if (!tempSettings.contains("selectedPattern")) {
-            tempSettings.setValue("selectedPattern", "");
-            tempSettings.sync();
-            qDebug() << "Added missing selectedPattern key to existing config";
+        if (!tempSettings.contains("General/selectedPattern")) {
+            tempSettings.setValue("General/selectedPattern", "");
         }
+
+        // Проверяем и добавляем отсутствующие ключи в секцию Camera
+        if (!tempSettings.contains("Camera/camera_ip")) {
+            tempSettings.setValue("Camera/camera_ip", "192.168.101.10");
+        }
+        if (!tempSettings.contains("Camera/host_ip")) {
+            tempSettings.setValue("Camera/host_ip", "192.168.101.201");
+        }
+        if (!tempSettings.contains("Camera/max_captures")) {
+            tempSettings.setValue("Camera/max_captures", 0);
+        }
+
+        // Проверяем и добавляем отсутствующие ключи в секцию ImageProcessing
+        if (!tempSettings.contains("ImageProcessing/ref_image_path")) {
+            // Устанавливаем путь к первому доступному изображению в netsurfaces
+            QDir netsurfacesDir("netsurfaces");
+            QString refImagePath = "reference.png";
+            if (netsurfacesDir.exists() && !netsurfacesDir.entryList(QStringList() << "*.png" << "*.jpg" << "*.jpeg", QDir::Files).isEmpty()) {
+                QString firstImage = netsurfacesDir.entryList(QStringList() << "*.png" << "*.jpg" << "*.jpeg", QDir::Files).first();
+                refImagePath = "netsurfaces/" + firstImage;
+            }
+            tempSettings.setValue("ImageProcessing/ref_image_path", refImagePath);
+        }
+        if (!tempSettings.contains("ImageProcessing/ref_image_scale")) {
+            tempSettings.setValue("ImageProcessing/ref_image_scale", 0.5);
+        }
+        if (!tempSettings.contains("ImageProcessing/orb_max_features")) {
+            tempSettings.setValue("ImageProcessing/orb_max_features", 500);
+        }
+        if (!tempSettings.contains("ImageProcessing/orb_scale_factor")) {
+            tempSettings.setValue("ImageProcessing/orb_scale_factor", 1.2);
+        }
+        if (!tempSettings.contains("ImageProcessing/orb_n_levels")) {
+            tempSettings.setValue("ImageProcessing/orb_n_levels", 4);
+        }
+        if (!tempSettings.contains("ImageProcessing/orb_edge_threshold")) {
+            tempSettings.setValue("ImageProcessing/orb_edge_threshold", 20);
+        }
+        if (!tempSettings.contains("ImageProcessing/orb_first_level")) {
+            tempSettings.setValue("ImageProcessing/orb_first_level", 0);
+        }
+        if (!tempSettings.contains("ImageProcessing/orb_wta_k")) {
+            tempSettings.setValue("ImageProcessing/orb_wta_k", 2);
+        }
+        if (!tempSettings.contains("ImageProcessing/orb_score_type")) {
+            tempSettings.setValue("ImageProcessing/orb_score_type", 1);
+        }
+        if (!tempSettings.contains("ImageProcessing/orb_patch_size")) {
+            tempSettings.setValue("ImageProcessing/orb_patch_size", 31);
+        }
+        if (!tempSettings.contains("ImageProcessing/orb_fast_threshold")) {
+            tempSettings.setValue("ImageProcessing/orb_fast_threshold", 20);
+        }
+        if (!tempSettings.contains("ImageProcessing/flann_search_params")) {
+            tempSettings.setValue("ImageProcessing/flann_search_params", 10);
+        }
+        if (!tempSettings.contains("ImageProcessing/good_match_ratio")) {
+            tempSettings.setValue("ImageProcessing/good_match_ratio", 0.65);
+        }
+        if (!tempSettings.contains("ImageProcessing/min_good_matches")) {
+            tempSettings.setValue("ImageProcessing/min_good_matches", 5);
+        }
+        if (!tempSettings.contains("ImageProcessing/ransac_threshold")) {
+            tempSettings.setValue("ImageProcessing/ransac_threshold", 3.0);
+        }
+        if (!tempSettings.contains("ImageProcessing/save_snapshots")) {
+            tempSettings.setValue("ImageProcessing/save_snapshots", false);
+        }
+
+        tempSettings.sync();
+        qDebug() << "Existing config file updated with missing keys";
     }
 
     // Инициализируем QSettings с явным указанием пути к файлу
@@ -276,10 +380,18 @@ void MainWindow::onSelectPatternClicked()
     QListWidgetItem* currentItem = ui->resultsListWidget->currentItem();
     if (currentItem && m_settings) {
         QString selectedFile = currentItem->data(Qt::UserRole).toString();
-        m_settings->setValue("selectedPattern", selectedFile);
+
+        // Сохраняем выбранный паттерн в секции General
+        m_settings->setValue("General/selectedPattern", selectedFile);
+
+        // Обновляем путь к референсному изображению в секции ImageProcessing
+        QString fullPath = "netsurfaces/" + selectedFile;
+        m_settings->setValue("ImageProcessing/ref_image_path", fullPath);
+
         m_settings->sync(); // Явно сохраняем изменения
 
         onLogMessage("Выбран рисунок: " + selectedFile);
+        onLogMessage("Референсное изображение обновлено: " + fullPath);
         QMessageBox::information(this, "Выбор рисунка", "Рисунок '" + selectedFile + "' выбран и сохранен в настройках.");
     }
 }
@@ -512,7 +624,7 @@ void MainWindow::selectDefaultPattern()
     }
     else if (m_settings) {
         // Иначе читаем из конфига
-        patternToSelect = m_settings->value("selectedPattern").toString();
+        patternToSelect = m_settings->value("General/selectedPattern").toString();
     }
 
     // Ищем файл в списке
