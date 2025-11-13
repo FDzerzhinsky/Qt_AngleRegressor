@@ -19,6 +19,11 @@ bool StandardImageLoader::canLoad(const QString& filePath) {
     return m_supportedFormats.contains(extension);
 }
 
+PdfImageLoader::PdfImageLoader(int dpi)
+    : m_dpi(dpi)
+{
+}
+
 // Реализация PdfImageLoader
 QPixmap PdfImageLoader::load(const QString& filePath) {
     // Создаем документ на стеке (без умного указателя)
@@ -35,8 +40,14 @@ QPixmap PdfImageLoader::load(const QString& filePath) {
     }
 
     // Получаем реальный DPI системы
+    //  TODO:   Задепрекейтить
     QScreen* screen = QGuiApplication::primaryScreen();
     qreal realDpi = screen ? screen->logicalDotsPerInch() : 96.0;
+
+    // Устанавливаем нужный DPI
+    qreal renderDpi = static_cast<qreal>(m_dpi);
+    
+
 
     // Получаем размер страницы в пунктах (1/72 дюйма)
     QSizeF pageSizeInPoints = pdfDocument.pagePointSize(0);
@@ -45,8 +56,8 @@ QPixmap PdfImageLoader::load(const QString& filePath) {
     }
 
     // Конвертируем в пиксели с использованием реального DPI
-    int renderWidth = static_cast<int>(pageSizeInPoints.width() * realDpi / 72.0);
-    int renderHeight = static_cast<int>(pageSizeInPoints.height() * realDpi / 72.0);
+    int renderWidth = static_cast<int>(pageSizeInPoints.width() * renderDpi / 72.0);
+    int renderHeight = static_cast<int>(pageSizeInPoints.height() * renderDpi / 72.0);
 
     qDebug() << "PDF Page size in points:" << pageSizeInPoints;
     qDebug() << "Real DPI:" << realDpi;
@@ -79,13 +90,14 @@ bool PdfImageLoader::canLoad(const QString& filePath) {
 }
 
 // Реализация ImageLoaderFactory
-std::unique_ptr<ImageLoader> ImageLoaderFactory::createLoader(const QString& filePath) {
+std::unique_ptr<ImageLoader> ImageLoaderFactory::createLoader(const QString& filePath, int pdfDpi) {
     // Создаем загрузчики и проверяем, какой может обработать файл
     auto pdfLoader = std::make_unique<PdfImageLoader>();
     auto standardLoader = std::make_unique<StandardImageLoader>();
 
     if (pdfLoader->canLoad(filePath)) {
-        return pdfLoader;
+        // ПЕРЕДАЕМ DPI В PDF ЗАГРУЗЧИК
+        return std::make_unique<PdfImageLoader>(pdfDpi);
     }
     else if (standardLoader->canLoad(filePath)) {
         return standardLoader;

@@ -27,12 +27,15 @@ private:
 // Загрузчик для PDF файлов
 class PdfImageLoader : public ImageLoader {
 public:
+    PdfImageLoader(int dpi = 300);
     QPixmap load(const QString& filePath) override;
     bool canLoad(const QString& filePath) override;  // УБЕДИТЕСЬ, ЧТО ЭТА СТРОКА ЕСТЬ!
+private:
+    int m_dpi;  // ЧЛЕН ДЛЯ ХРАНЕНИЯ DPI
 };
 
 // Фабрика для создания загрузчиков
 class ImageLoaderFactory {
 public:
-    static std::unique_ptr<ImageLoader> createLoader(const QString& filePath);
+    static std::unique_ptr<ImageLoader> createLoader(const QString& filePath, int pdfDpi = 300);
 };

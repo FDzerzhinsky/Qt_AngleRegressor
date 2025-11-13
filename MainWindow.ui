@@ -18,7 +18,7 @@
     <item>
      <widget class="QTabWidget" name="tabWidget">
       <property name="currentIndex">
-       <number>0</number>
+       <number>1</number>
       </property>
       <widget class="QWidget" name="socketTab">
        <attribute name="title">
@@ -161,6 +161,32 @@
           </property>
           <layout class="QHBoxLayout" name="loadLayout">
            <item>
+            <widget class="QLabel" name="setDPILabel">
+             <property name="text">
+              <string>Установить DPI</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="SetDPILineEdit">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>40</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>300</string>
+             </property>
+            </widget>
+           </item>
+           <item>
             <widget class="QPushButton" name="loadImageButton">
              <property name="text">
               <string>Загрузить изображение</string>
@@ -173,6 +199,19 @@
               <string>Файл не выбран</string>
              </property>
             </widget>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_5">
+             <property name="orientation">
+              <enum>Qt::Orientation::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
            </item>
           </layout>
          </widget>

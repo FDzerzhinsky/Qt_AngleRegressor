@@ -38,7 +38,7 @@ BusinessLogic::~BusinessLogic()
 }
 
 // =============================================================================
-// НОВЫЙ МЕТОД ДЛЯ ИНИЦИАЛИЗАЦИИ В ПРАВИЛЬНОМ ПОТОКЕ
+// МЕТОД ДЛЯ ИНИЦИАЛИЗАЦИИ В ПРАВИЛЬНОМ ПОТОКЕ
 // =============================================================================
 void BusinessLogic::initialize()
 {
@@ -129,7 +129,7 @@ void BusinessLogic::loadImage(const QString& filePath)
 {
     try {
         // Используем фабрику для создания подходящего загрузчика
-        auto loader = ImageLoaderFactory::createLoader(filePath);
+        auto loader = ImageLoaderFactory::createLoader(filePath, m_pdfRenderingDpi);
         QPixmap image = loader->load(filePath);
 
         if (!image.isNull()) {
@@ -185,6 +185,20 @@ void BusinessLogic::clearImage()
     m_currentImagePath.clear();
     emit imageCleared();
     emit logMessage("Image cleared");
+}
+
+// =============================================================================
+// СЛОТ ДЛЯ УСТАНОВКИ DPI РЕНДЕРИНГА PDF
+// =============================================================================
+void BusinessLogic::setPdfRenderingDpi(int dpi)
+{
+    if (dpi >= 72 && dpi <= 1200) {  // РАЗУМНЫЕ ПРЕДЕЛЫ DPI
+        m_pdfRenderingDpi = dpi;
+        emit logMessage(QString("PDF rendering DPI set to: %1").arg(dpi));
+    }
+    else {
+        emit logMessage(QString("Invalid DPI value: %1 (must be between 72-1200)").arg(dpi));
+    }
 }
 
 // ==================== КОМПЬЮТЕРНОЕ ЗРЕНИЕ ====================

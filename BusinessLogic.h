@@ -31,6 +31,7 @@ public slots:
     void loadImage(const QString& filePath);
     void processImage(const QPixmap& croppedImage, const QString& fileName);
     void clearImage();
+    void setPdfRenderingDpi(int dpi);  //  якнр дкъ сярюмнбйх DPI
 
     // ==================== йнлоэчрепмне гпемхе ====================
     void startVisionSystem();
@@ -72,6 +73,7 @@ private:
     // ==================== йнлоэчрепмне гпемхе ====================
     VisionSystemManager* m_visionManager;
     QThread* m_visionThread;
+    int m_pdfRenderingDpi = 300;  // гмювемхе DPI он слнквюмхч
 
     // ==================== бяонлнцюрекэмше лерндш ====================
     void setupSocketConnections();

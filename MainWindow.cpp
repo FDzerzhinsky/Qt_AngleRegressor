@@ -8,7 +8,7 @@
 #include <QDateTime>
 #include <QDir>
 #include <QListWidgetItem>
-#include <QPixmap>
+#include <QPixmap>  
 #include <QDirIterator>
 #include <QApplication>
 #include <QFile>
@@ -58,6 +58,8 @@ MainWindow::MainWindow(QWidget* parent)
 
     // Инициализация списка изображений на третьей вкладке
     updateResultsList();
+    ui->SetDPILineEdit->setText("300");
+    ui->SetDPILineEdit->setValidator(new QIntValidator(72, 1200, this));  // ОГРАНИЧЕНИЕ ДИАПАЗОНА
 }
 
 MainWindow::~MainWindow()
@@ -149,6 +151,13 @@ void MainWindow::setupConnections()
         });
     connect(ui->selectPatternButton, &QPushButton::clicked, this, &MainWindow::onSelectPatternClicked);
     connect(ui->resultsListWidget, &QListWidget::itemSelectionChanged, this, &MainWindow::onPatternSelectionChanged);
+    connect(ui->SetDPILineEdit, &QLineEdit::textChanged, this, [this](const QString& text) {
+        bool ok;
+        int dpi = text.toInt(&ok);
+        if (ok) {
+            m_businessLogic->setPdfRenderingDpi(dpi);
+        }
+        });
 
     // ==================== СОЕДИНЕНИЯ ДЛЯ ВКЛАДКИ "КОМПЬЮТЕРНОЕ ЗРЕНИЕ" ====================
     // ВАЖНО: Подключаем кнопки компьютерного зрения напрямую
