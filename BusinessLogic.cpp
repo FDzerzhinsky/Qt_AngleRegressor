@@ -1,4 +1,4 @@
-﻿// [file name]: BusinessLogic.cpp
+﻿//  [file name]: BusinessLogic.cpp
 #include "BusinessLogic.h"
 #include "VisionSystemManager.h"
 #include <QFileInfo>
@@ -7,9 +7,10 @@
 
 BusinessLogic::BusinessLogic(QObject* parent)
     : QObject(parent)
-    , m_tcpSocket(nullptr)  // ИНИЦИАЛИЗИРУЕМ НУЛЕВЫМ УКАЗАТЕЛЕМ
+    , m_tcpSocket(nullptr)
     , m_visionManager(new VisionSystemManager())
     , m_visionThread(new QThread(this))
+    , m_pdfRenderingDpi(300)
 {
     // НЕ создаем сокет здесь - он будет создан в initialize()
 }
@@ -42,6 +43,8 @@ BusinessLogic::~BusinessLogic()
 // =============================================================================
 void BusinessLogic::initialize()
 {
+    qDebug() << "BusinessLogic::initialize() - Creating socket in thread:" << QThread::currentThread();
+
     // Создаем сокет в том же потоке, где работает BusinessLogic
     m_tcpSocket = new QTcpSocket(this);
     setupSocketConnections();
@@ -91,12 +94,14 @@ void BusinessLogic::connectToHost(const QString& ip, quint16 port)
     }
 
     emit logMessage(QString("Connecting to %1:%2...").arg(ip).arg(port));
+    qDebug() << "BusinessLogic::connectToHost - Connecting to" << ip << ":" << port;
     m_tcpSocket->connectToHost(ip, port);
 }
 
 void BusinessLogic::disconnectFromHost()
 {
     if (!m_tcpSocket) return;
+    qDebug() << "BusinessLogic::disconnectFromHost - Disconnecting";
     m_tcpSocket->disconnectFromHost();
 }
 
@@ -114,8 +119,9 @@ void BusinessLogic::sendMessage(const QString& message)
             emit logMessage(QString("Failed to send message: %1").arg(m_tcpSocket->errorString()));
         }
         else {
-            m_tcpSocket->flush(); // ОБЕСПЕЧИВАЕМ НЕМЕДЛЕННУЮ ОТПРАВКУ
+            m_tcpSocket->flush();
             emit logMessage(QString("Sent: %1").arg(message));
+            qDebug() << "BusinessLogic::sendMessage - Sent:" << message;
         }
     }
     else if (!message.isEmpty()) {
@@ -192,7 +198,7 @@ void BusinessLogic::clearImage()
 // =============================================================================
 void BusinessLogic::setPdfRenderingDpi(int dpi)
 {
-    if (dpi >= 72 && dpi <= 1200) {  // РАЗУМНЫЕ ПРЕДЕЛЫ DPI
+    if (dpi >= 72 && dpi <= 1200) {
         m_pdfRenderingDpi = dpi;
         emit logMessage(QString("PDF rendering DPI set to: %1").arg(dpi));
     }
@@ -220,7 +226,6 @@ void BusinessLogic::startVisionSystem()
     }
 
     // ВАЖНО: Используем прямой вызов через QMetaObject::invokeMethod
-    // с правильным указанием типа соединения
     bool result = QMetaObject::invokeMethod(m_visionManager, "startVisionSystem", Qt::QueuedConnection);
     qDebug() << "BusinessLogic::startVisionSystem() - Invoke method result:" << result;
 
@@ -256,7 +261,6 @@ void BusinessLogic::sendVisionResult(const QString& snapshotName, int xPosition,
     // =========================================================================
     // ФОРМИРОВАНИЕ СООБЩЕНИЯ ДЛЯ ОТОБРАЖЕНИЯ В GUI
     // =========================================================================
-    // Это сообщение отображается на вкладке "Определение угла"
     QString displayMessage = QString("[%1] X Position: %2, Processing Time: %3 ms")
         .arg(snapshotName)
         .arg(xPosition)
@@ -268,7 +272,6 @@ void BusinessLogic::sendVisionResult(const QString& snapshotName, int xPosition,
     // =========================================================================
     // ФОРМИРОВАНИЕ СООБЩЕНИЯ ДЛЯ ОТПРАВКИ ПО СOKЕТУ
     // =========================================================================
-    // Формируем сообщение в том же формате, что и в оригинальном проекте
     QString socketMessage = QString("%1;Position:%2;Time:%3 ms")
         .arg(snapshotName)
         .arg(xPosition)
@@ -282,12 +285,14 @@ void BusinessLogic::sendVisionResult(const QString& snapshotName, int xPosition,
 
 void BusinessLogic::onSocketConnected()
 {
+    qDebug() << "BusinessLogic::onSocketConnected - Socket connected successfully";
     emit logMessage("Connected to server");
     emit connectionStateChanged(true);
 }
 
 void BusinessLogic::onSocketDisconnected()
 {
+    qDebug() << "BusinessLogic::onSocketDisconnected - Socket disconnected";
     emit logMessage("Disconnected from server");
     emit connectionStateChanged(false);
 }
@@ -297,6 +302,7 @@ void BusinessLogic::onSocketError(QAbstractSocket::SocketError error)
     Q_UNUSED(error)
         if (m_tcpSocket) {
             QString errorString = m_tcpSocket->errorString();
+            qDebug() << "BusinessLogic::onSocketError - Socket error:" << errorString;
             emit logMessage("Socket error: " + errorString);
             emit socketError(errorString);
         }
@@ -306,9 +312,38 @@ void BusinessLogic::onSocketReadyRead()
 {
     if (!m_tcpSocket) return;
 
-    QByteArray data = m_tcpSocket->readAll();
-    QString message = QString::fromUtf8(data).trimmed();
-    emit logMessage(QString("Received: %1").arg(message));
+    qDebug() << "BusinessLogic::onSocketReadyRead - Data available:" << m_tcpSocket->bytesAvailable() << "bytes";
+
+    // =========================================================================
+    // ЧТЕНИЕ ДАННЫХ ОТ СОКЕТА И ПЕРЕДАЧА ИХ В GUI ДЛЯ СОХРАНЕНИЯ
+    // =========================================================================
+    while (m_tcpSocket->canReadLine()) {
+        QByteArray data = m_tcpSocket->readLine();
+        QString message = QString::fromUtf8(data).trimmed();
+
+        // Логируем полученное сообщение
+        qDebug() << "BusinessLogic::onSocketReadyRead - Received raw data:" << data;
+        qDebug() << "BusinessLogic::onSocketReadyRead - Received message:" << message;
+
+        emit logMessage(QString("Received: %1").arg(message));
+
+        // =====================================================================
+        // ОТПРАВЛЯЕМ ДАННЫЕ В GUI ДЛЯ ВОЗМОЖНОГО СОХРАНЕНИЯ В ФАЙЛ values.txt
+        // =====================================================================
+        emit socketDataReceived(message);
+    }
+
+    // Если данные есть, но нет завершающей строки, читаем все что есть
+    if (m_tcpSocket->bytesAvailable() > 0 && !m_tcpSocket->canReadLine()) {
+        QByteArray data = m_tcpSocket->readAll();
+        QString message = QString::fromUtf8(data).trimmed();
+
+        qDebug() << "BusinessLogic::onSocketReadyRead - Received incomplete data:" << data;
+        qDebug() << "BusinessLogic::onSocketReadyRead - Received incomplete message:" << message;
+
+        emit logMessage(QString("Received (incomplete): %1").arg(message));
+        emit socketDataReceived(message);
+    }
 }
 
 // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================

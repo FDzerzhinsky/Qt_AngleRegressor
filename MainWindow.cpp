@@ -19,8 +19,9 @@
 #include <QLabel>
 #include <QTextEdit>
 #include <QDebug>
+#include <QMutexLocker>
 
-MainWindow::MainWindow(QWidget* parent)
+MainWindow::MainWindow(QWidget * parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , m_businessLogic(new BusinessLogic)
@@ -28,11 +29,12 @@ MainWindow::MainWindow(QWidget* parent)
     , m_cropDialog(new CropDialog(this))
     , m_settings(nullptr)
     , m_justSavedImage(false)
+    , m_socketConnected(false)
 {
     ui->setupUi(this);
 
     // ==================== УСТАНОВКА СТАРТОВОЙ ВКЛАДКИ ====================
-    ui->tabWidget->setCurrentIndex(0); // 0 = Сокет, 1 = Развёртка, 2 = Выбор рисунка
+    ui->tabWidget->setCurrentIndex(0);
 
     // ==================== ИНИЦИАЛИЗАЦИЯ НАСТРОЕК ====================
     initializeSettings();
@@ -55,27 +57,25 @@ MainWindow::MainWindow(QWidget* parent)
     // ==================== ИНИЦИАЛИЗАЦИЯ СОСТОЯНИЯ ИНТЕРФЕЙСА ====================
     updateSendButtonState();
     updateImageButtonsState();
+    updateGetFromSocketState();
 
     // Инициализация списка изображений на третьей вкладке
     updateResultsList();
     ui->SetDPILineEdit->setText("300");
-    ui->SetDPILineEdit->setValidator(new QIntValidator(72, 1200, this));  // ОГРАНИЧЕНИЕ ДИАПАЗОНА
+    ui->SetDPILineEdit->setValidator(new QIntValidator(72, 1200, this));
 }
 
 MainWindow::~MainWindow()
 {
     // ==================== КОРРЕКТНОЕ ЗАВЕРШЕНИЕ ПОТОКА ====================
-    // Плавное завершение работы потока бизнес-логики
     m_businessThread->quit();
     m_businessThread->wait(1000);
 
-    // Принудительное завершение если поток не ответил
     if (m_businessThread->isRunning()) {
         m_businessThread->terminate();
         m_businessThread->wait();
     }
 
-    // Сохраняем настройки перед выходом
     if (m_settings) {
         m_settings->sync();
         delete m_settings;
@@ -87,15 +87,9 @@ MainWindow::~MainWindow()
 
 void MainWindow::initializeSettings()
 {
-    // =============================================================================
-    // ИНИЦИАЛИЗАЦИЯ УНИФИЦИРОВАННОГО КОНФИГУРАЦИОННОГО ФАЙЛА
-    // =============================================================================
-    // ОПРЕДЕЛЯЕМ ПУТЬ К ФАЙЛУ НАСТРОЕК В ПАПКЕ С ИСПОЛНЯЕМЫМ ФАЙЛОМ
-    // Это гарантирует, что конфиг всегда будет рядом с exe-файлом
     QString configPath = QApplication::applicationDirPath() + "/config.ini";
     qDebug() << "Config file path:" << configPath;
 
-    // Явно создаем файл настроек с полной структурой, если его нет
     if (!QFile::exists(configPath)) {
         QFile configFile(configPath);
         if (configFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -109,7 +103,6 @@ void MainWindow::initializeSettings()
             out << "max_captures=0\n";
             out << "\n";
             out << "[ImageProcessing]\n";
-            // Автоматически выбираем первое изображение из netsurfaces если папка существует
             QDir netsurfacesDir("netsurfaces");
             QString refImagePath = "reference.png";
             if (netsurfacesDir.exists() && !netsurfacesDir.entryList(QStringList() << "*.png" << "*.jpg" << "*.jpeg", QDir::Files).isEmpty()) {
@@ -139,100 +132,11 @@ void MainWindow::initializeSettings()
             qWarning() << "Failed to create config file at:" << configPath;
         }
     }
-    else {
-        // Файл уже существует - проверяем и дополняем его структуру
-        QSettings tempSettings(configPath, QSettings::IniFormat);
 
-        // Если нет ключа selectedPattern - добавляем его
-        if (!tempSettings.contains("General/selectedPattern")) {
-            tempSettings.setValue("General/selectedPattern", "");
-        }
-
-        // Проверяем и добавляем отсутствующие ключи в секцию Camera
-        if (!tempSettings.contains("Camera/camera_ip")) {
-            tempSettings.setValue("Camera/camera_ip", "192.168.101.10");
-        }
-        if (!tempSettings.contains("Camera/host_ip")) {
-            tempSettings.setValue("Camera/host_ip", "192.168.101.201");
-        }
-        if (!tempSettings.contains("Camera/max_captures")) {
-            tempSettings.setValue("Camera/max_captures", 0);
-        }
-
-        // Проверяем и добавляем отсутствующие ключи в секцию ImageProcessing
-        if (!tempSettings.contains("ImageProcessing/ref_image_path")) {
-            // Устанавливаем путь к первому доступному изображению в netsurfaces
-            QDir netsurfacesDir("netsurfaces");
-            QString refImagePath = "reference.png";
-            if (netsurfacesDir.exists() && !netsurfacesDir.entryList(QStringList() << "*.png" << "*.jpg" << "*.jpeg", QDir::Files).isEmpty()) {
-                QString firstImage = netsurfacesDir.entryList(QStringList() << "*.png" << "*.jpg" << "*.jpeg", QDir::Files).first();
-                refImagePath = "netsurfaces/" + firstImage;
-            }
-            tempSettings.setValue("ImageProcessing/ref_image_path", refImagePath);
-        }
-        if (!tempSettings.contains("ImageProcessing/ref_image_scale")) {
-            tempSettings.setValue("ImageProcessing/ref_image_scale", 0.5);
-        }
-        if (!tempSettings.contains("ImageProcessing/orb_max_features")) {
-            tempSettings.setValue("ImageProcessing/orb_max_features", 500);
-        }
-        if (!tempSettings.contains("ImageProcessing/orb_scale_factor")) {
-            tempSettings.setValue("ImageProcessing/orb_scale_factor", 1.2);
-        }
-        if (!tempSettings.contains("ImageProcessing/orb_n_levels")) {
-            tempSettings.setValue("ImageProcessing/orb_n_levels", 4);
-        }
-        if (!tempSettings.contains("ImageProcessing/orb_edge_threshold")) {
-            tempSettings.setValue("ImageProcessing/orb_edge_threshold", 20);
-        }
-        if (!tempSettings.contains("ImageProcessing/orb_first_level")) {
-            tempSettings.setValue("ImageProcessing/orb_first_level", 0);
-        }
-        if (!tempSettings.contains("ImageProcessing/orb_wta_k")) {
-            tempSettings.setValue("ImageProcessing/orb_wta_k", 2);
-        }
-        if (!tempSettings.contains("ImageProcessing/orb_score_type")) {
-            tempSettings.setValue("ImageProcessing/orb_score_type", 1);
-        }
-        if (!tempSettings.contains("ImageProcessing/orb_patch_size")) {
-            tempSettings.setValue("ImageProcessing/orb_patch_size", 31);
-        }
-        if (!tempSettings.contains("ImageProcessing/orb_fast_threshold")) {
-            tempSettings.setValue("ImageProcessing/orb_fast_threshold", 20);
-        }
-        if (!tempSettings.contains("ImageProcessing/flann_search_params")) {
-            tempSettings.setValue("ImageProcessing/flann_search_params", 10);
-        }
-        if (!tempSettings.contains("ImageProcessing/good_match_ratio")) {
-            tempSettings.setValue("ImageProcessing/good_match_ratio", 0.65);
-        }
-        if (!tempSettings.contains("ImageProcessing/min_good_matches")) {
-            tempSettings.setValue("ImageProcessing/min_good_matches", 5);
-        }
-        if (!tempSettings.contains("ImageProcessing/ransac_threshold")) {
-            tempSettings.setValue("ImageProcessing/ransac_threshold", 3.0);
-        }
-        if (!tempSettings.contains("ImageProcessing/save_snapshots")) {
-            tempSettings.setValue("ImageProcessing/save_snapshots", false);
-        }
-
-        tempSettings.sync();
-        qDebug() << "Existing config file updated with missing keys";
-    }
-
-    // Инициализируем QSettings с явным указанием пути к файлу
     m_settings = new QSettings(configPath, QSettings::IniFormat, this);
     qDebug() << "Using config file:" << m_settings->fileName();
-
-    // Логируем текущие настройки для отладки
-    qDebug() << "Current settings:";
-    QStringList allKeys = m_settings->allKeys();
-    for (const QString& key : allKeys) {
-        qDebug() << "  " << key << "=" << m_settings->value(key).toString();
-    }
 }
 
-// ==================== НАСТРОЙКА СОЕДИНЕНИЙ МЕЖДУ GUI И БИЗНЕС-ЛОГИКОЙ ====================
 void MainWindow::setupConnections()
 {
     // ==================== СОЕДИНЕНИЯ ДЛЯ ВКЛАДКИ "СОКЕТ" ====================
@@ -249,7 +153,7 @@ void MainWindow::setupConnections()
 
     // ==================== СОЕДИНЕНИЯ ДЛЯ ВКЛАДКИ "ВЫБОР РИСУНКА" ====================
     connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
-        if (index == 2) { // Индекс вкладки "Выбор рисунка"
+        if (index == 2) {
             onResultsTabActivated();
         }
         });
@@ -264,36 +168,201 @@ void MainWindow::setupConnections()
         });
 
     // ==================== СОЕДИНЕНИЯ ДЛЯ ВКЛАДКИ "КОМПЬЮТЕРНОЕ ЗРЕНИЕ" ====================
-    // ВАЖНО: Подключаем кнопки компьютерного зрения напрямую
     connect(ui->startVisionButton, &QPushButton::clicked, this, &MainWindow::onStartVisionClicked);
     connect(ui->stopVisionButton, &QPushButton::clicked, this, &MainWindow::onStopVisionClicked);
 
     // =============================================================================
-    // НОВОЕ СОЕДИНЕНИЕ ДЛЯ ЧЕКБОКСА СОХРАНЕНИЯ СНЭПШОТОВ
+    // НОВЫЕ СОЕДИНЕНИЯ ДЛЯ ЧЕКБОКСОВ
     // =============================================================================
-    connect(ui->saveSnapsCheckBox, &QCheckBox::toggled, m_businessLogic, &BusinessLogic::setSaveSnapshots);
+    connect(ui->saveSnapsCheckBox, &QCheckBox::toggled, this, &MainWindow::onSaveSnapshotsToggled);
+    connect(ui->getFromSockCheckBox, &QCheckBox::toggled, this, &MainWindow::onGetFromSocketToggled);
 
     // ==================== СОЕДИНЕНИЯ С БИЗНЕС-ЛОГИКОЙ ====================
-    // Сигналы от бизнес-логики к GUI (межпоточные соединения)
     connect(m_businessLogic, &BusinessLogic::logMessage, this, &MainWindow::onLogMessage);
     connect(m_businessLogic, &BusinessLogic::connectionStateChanged, this, &MainWindow::onConnectionStateChanged);
     connect(m_businessLogic, &BusinessLogic::imageLoaded, this, &MainWindow::onImageLoaded);
     connect(m_businessLogic, &BusinessLogic::imageProcessed, this, &MainWindow::onImageProcessed);
     connect(m_businessLogic, &BusinessLogic::imageCleared, this, &MainWindow::onImageCleared);
     connect(m_businessLogic, &BusinessLogic::socketError, this, &MainWindow::onSocketError);
+    connect(m_businessLogic, &BusinessLogic::socketDataReceived, this, &MainWindow::onSocketDataReceived);
+    connect(m_businessLogic, &BusinessLogic::visionResultReceived, this, &MainWindow::onVisionResultReceived);
+    connect(m_businessLogic, &BusinessLogic::visionResultReceivedForDisplay, this, &MainWindow::onVisionResultReceivedForDisplay);
+    connect(m_businessLogic, &BusinessLogic::visionSystemError, this, &MainWindow::onVisionSystemError);
+}
 
-    // ==================== СОЕДИНЕНИЯ С БИЗНЕС-ЛОГИКОЙ ДЛЯ КОМПЬЮТЕРНОГО ЗРЕНИЯ ====================
-    connect(m_businessLogic, &BusinessLogic::visionResultReceived,
-        this, &MainWindow::onVisionResultReceived);
+// =============================================================================
+// ОСНОВНОЙ МЕТОД ДЛЯ СОПОСТАВЛЕНИЯ СНЭПШОТОВ И ЗНАЧЕНИЙ ИЗ СОКЕТА
+// =============================================================================
+void MainWindow::processDataPairing()
+{
+    if (!ui->getFromSockCheckBox->isChecked() || !ui->saveSnapsCheckBox->isChecked()) {
+        return;
+    }
 
-    // =============================================================================
-    // НОВОЕ СОЕДИНЕНИЕ ДЛЯ ОТОБРАЖЕНИЯ РЕЗУЛЬТАТОВ ОБРАБОТКИ В GUI
-    // =============================================================================
-    connect(m_businessLogic, &BusinessLogic::visionResultReceivedForDisplay,
-        this, &MainWindow::onVisionResultReceivedForDisplay);
+    QMutexLocker locker(&m_dataMutex);
 
-    connect(m_businessLogic, &BusinessLogic::visionSystemError,
-        this, &MainWindow::onVisionSystemError);
+    // Получаем количество снэпшотов и записей в values.txt
+    int snapshotCount = getSnapshotCount();
+    int valuePairsCount = countValuePairs();
+
+    qDebug() << "Snapshot count:" << snapshotCount << "Value pairs count:" << valuePairsCount;
+
+    // Если снэпшотов больше чем записей - значит есть несопоставленные снэпшоты
+    if (snapshotCount > valuePairsCount) {
+        // Находим последний несопоставленный снэпшот
+        QString latestSnapshot = findLatestUnpairedSnapshot();
+
+        if (!latestSnapshot.isEmpty() && !m_pendingSocketValues.isEmpty()) {
+            // Берем первое значение из очереди
+            QString socketValue = m_pendingSocketValues.takeFirst();
+
+            // Сохраняем пару
+            saveValuePair(latestSnapshot, socketValue);
+
+            qDebug() << "Paired snapshot:" << latestSnapshot << "with value:" << socketValue;
+            onLogMessage(QString("Paired: %1 : %2").arg(latestSnapshot).arg(socketValue));
+        }
+    }
+}
+
+// =============================================================================
+// МЕТОД ДЛЯ СОХРАНЕНИЯ ПАРЫ В ФАЙЛ values.txt
+// =============================================================================
+void MainWindow::saveValuePair(const QString& snapshotName, const QString& socketValue)
+{
+    QFile file("values.txt");
+    if (file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+        QTextStream out(&file);
+        QString line = QString("%1 : %2\n").arg(snapshotName).arg(socketValue);
+        out << line;
+        file.close();
+
+        onLogMessage(QString("Saved to values.txt: %1 : %2").arg(snapshotName).arg(socketValue));
+        qDebug() << "Saved value pair:" << line;
+    }
+    else {
+        onLogMessage("ERROR: Failed to open values.txt for writing");
+        qWarning() << "Failed to open values.txt for writing";
+    }
+}
+
+// =============================================================================
+// ПОИСК ПОСЛЕДНЕГО НЕСОПОСТАВЛЕННОГО СНЭПШОТА
+// =============================================================================
+QString MainWindow::findLatestUnpairedSnapshot()
+{
+    QDir snapsDir("snaps");
+    if (!snapsDir.exists()) {
+        return QString();
+    }
+
+    // Получаем все PNG файлы, отсортированные по времени изменения (новые первыми)
+    QStringList filters;
+    filters << "*.png";
+    QFileInfoList fileList = snapsDir.entryInfoList(filters, QDir::Files, QDir::Time);
+
+    if (fileList.isEmpty()) {
+        return QString();
+    }
+
+    // Количество записей в values.txt
+    int valuePairsCount = countValuePairs();
+
+    // Если количество снэпшотов больше количества записей, берем снэпшот по индексу = количеству записей
+    if (fileList.size() > valuePairsCount) {
+        return fileList[valuePairsCount].baseName();
+    }
+
+    return QString();
+}
+
+// =============================================================================
+// ПОДСЧЕТ КОЛИЧЕСТВА СНЭПШОТОВ В ПАПКЕ SNAPS
+// =============================================================================
+int MainWindow::getSnapshotCount()
+{
+    QDir snapsDir("snaps");
+    if (!snapsDir.exists()) {
+        return 0;
+    }
+
+    QStringList filters;
+    filters << "*.png";
+    return snapsDir.entryList(filters, QDir::Files).count();
+}
+
+// =============================================================================
+// ПОДСЧЕТ КОЛИЧЕСТВА ЗАПИСЕЙ В ФАЙЛЕ values.txt
+// =============================================================================
+int MainWindow::countValuePairs()
+{
+    QFile file("values.txt");
+    if (!file.exists()) {
+        return 0;
+    }
+
+    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QTextStream in(&file);
+        int count = 0;
+        while (!in.atEnd()) {
+            in.readLine();
+            count++;
+        }
+        file.close();
+        return count;
+    }
+
+    return 0;
+}
+
+void MainWindow::onSaveSnapshotsToggled(bool checked)
+{
+    m_businessLogic->setSaveSnapshots(checked);
+    updateGetFromSocketState();
+}
+
+void MainWindow::onGetFromSocketToggled(bool checked)
+{
+    if (checked) {
+        onLogMessage("Get from socket enabled - values will be saved to values.txt");
+        // Создаем файл values.txt если его нет
+        QFile file("values.txt");
+        if (!file.exists()) {
+            if (file.open(QIODevice::WriteOnly)) {
+                file.close();
+                onLogMessage("Created values.txt file");
+            }
+        }
+    }
+    else {
+        onLogMessage("Get from socket disabled");
+    }
+}
+
+void MainWindow::onSocketDataReceived(const QString& data)
+{
+    if (ui->getFromSockCheckBox->isChecked() && ui->saveSnapsCheckBox->isChecked()) {
+        QMutexLocker locker(&m_dataMutex);
+
+        // Добавляем значение в список ожидания
+        m_pendingSocketValues.append(data.trimmed());
+
+        // Пытаемся сопоставить данные
+        processDataPairing();
+
+        onLogMessage(QString("Socket data received: %1").arg(data));
+        qDebug() << "Socket data received:" << data;
+    }
+}
+
+void MainWindow::updateGetFromSocketState()
+{
+    bool isEnabled = ui->saveSnapsCheckBox->isChecked() && m_socketConnected;
+    ui->getFromSockCheckBox->setEnabled(isEnabled);
+
+    if (!isEnabled) {
+        ui->getFromSockCheckBox->setChecked(false);
+    }
 }
 
 // ==================== РЕАЛИЗАЦИЯ СЛОТОВ ДЛЯ ВКЛАДКИ "СОКЕТ" ====================
@@ -331,7 +400,6 @@ void MainWindow::onMessageTextChanged(const QString& text)
 // ==================== РЕАЛИЗАЦИЯ СЛОТОВ ДЛЯ ВКЛАДКИ "РАЗВЁРТКА" ====================
 void MainWindow::onLoadImageClicked()
 {
-    // Диалог выбора файла с поддержкой различных форматов
     QString fileName = QFileDialog::getOpenFileName(this,
         "Select Image",
         "",
@@ -346,14 +414,9 @@ void MainWindow::onProcessImageClicked()
 {
     if (!m_croppedImage.isNull()) {
         ui->processImageButton->setEnabled(false);
-
         QString filename = ui->netnamelineEdit->text().trimmed();
-
-        // Сохраняем имя файла для выделения на третьей вкладке и устанавливаем флаг
         m_lastSavedImage = filename;
         m_justSavedImage = true;
-
-        // Передаем обрезанное изображение и имя файла в бизнес-логику для сохранения
         m_businessLogic->processImage(m_croppedImage, filename);
     }
     else {
@@ -380,16 +443,10 @@ void MainWindow::onSelectPatternClicked()
     QListWidgetItem* currentItem = ui->resultsListWidget->currentItem();
     if (currentItem && m_settings) {
         QString selectedFile = currentItem->data(Qt::UserRole).toString();
-
-        // Сохраняем выбранный паттерн в секции General
         m_settings->setValue("General/selectedPattern", selectedFile);
-
-        // Обновляем путь к референсному изображению в секции ImageProcessing
         QString fullPath = "netsurfaces/" + selectedFile;
         m_settings->setValue("ImageProcessing/ref_image_path", fullPath);
-
-        m_settings->sync(); // Явно сохраняем изменения
-
+        m_settings->sync();
         onLogMessage("Выбран рисунок: " + selectedFile);
         onLogMessage("Референсное изображение обновлено: " + fullPath);
         QMessageBox::information(this, "Выбор рисунка", "Рисунок '" + selectedFile + "' выбран и сохранен в настройках.");
@@ -424,16 +481,16 @@ void MainWindow::onStopVisionClicked()
 
 void MainWindow::onVisionResultReceived(const QString& snapshotName, int xPosition, double totalTime)
 {
-    // Этот слот теперь не используется для отображения в GUI
-    // Вместо него используется visionResultReceivedForDisplay
     Q_UNUSED(snapshotName)
         Q_UNUSED(xPosition)
         Q_UNUSED(totalTime)
+
+        // При получении результата обработки кадра пытаемся сопоставить данные
+        if (ui->getFromSockCheckBox->isChecked() && ui->saveSnapsCheckBox->isChecked()) {
+            processDataPairing();
+        }
 }
 
-// =============================================================================
-// НОВЫЙ СЛОТ ДЛЯ ОТОБРАЖЕНИЯ РЕЗУЛЬТАТОВ ОБРАБОТКИ В GUI
-// =============================================================================
 void MainWindow::onVisionResultReceivedForDisplay(const QString& displayMessage)
 {
     ui->visionResultsTextEdit->append(displayMessage);
@@ -448,31 +505,33 @@ void MainWindow::onVisionSystemError(const QString& error)
 // ==================== СЛОТЫ ДЛЯ ОБРАБОТКИ СИГНАЛОВ ОТ БИЗНЕС-ЛОГИКИ ====================
 void MainWindow::onLogMessage(const QString& message)
 {
-    // Добавление временной метки к каждому сообщению в логе
     QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss");
     ui->logTextEdit->append(QString("[%1] %2").arg(timestamp, message));
 }
 
 void MainWindow::onConnectionStateChanged(bool connected)
 {
-    // Обновление состояния кнопок подключения/отключения
     ui->connectButton->setEnabled(!connected);
     ui->disconnectButton->setEnabled(connected);
+    m_socketConnected = connected;
     updateSendButtonState();
+    updateGetFromSocketState();
+
+    if (connected) {
+        onLogMessage("Socket connection established - get from socket feature available");
+    }
+    else {
+        onLogMessage("Socket connection lost - get from socket feature disabled");
+    }
 }
 
 void MainWindow::onImageLoaded(const QPixmap& originalImage, const QString& fileName)
 {
     m_currentImage = originalImage;
-
-    // Показываем диалог кадрирования перед отображением изображения
     m_cropDialog->setImage(originalImage);
 
     if (m_cropDialog->exec() == QDialog::Accepted) {
-        // Получаем кадрированное изображение
         m_croppedImage = m_cropDialog->getCroppedImage();
-
-        // Масштабируем изображение для отображения в preview
         QSize labelSize = ui->imagePreviewLabel->size();
         QPixmap scaledImage = m_croppedImage.scaled(
             labelSize.width() - 10,
@@ -481,10 +540,8 @@ void MainWindow::onImageLoaded(const QPixmap& originalImage, const QString& file
             Qt::SmoothTransformation
         );
 
-        // Устанавливаем изображение и информацию о файле
         ui->imagePreviewLabel->setPixmap(scaledImage);
 
-        // Добавляем пометку о кадрировании если оно было применено
         if (m_cropDialog->getCroppedImage().size() != originalImage.size()) {
             ui->imagePathLabel->setText(fileName + " (cropped)");
         }
@@ -492,28 +549,22 @@ void MainWindow::onImageLoaded(const QPixmap& originalImage, const QString& file
             ui->imagePathLabel->setText(fileName);
         }
 
-        // Обновляем поле имени файла с автоматически сгенерированным именем
         updateNetNameEdit();
-
         updateImageButtonsState();
-        ui->tabWidget->setCurrentIndex(1); // Переключаемся на вкладку с изображением
+        ui->tabWidget->setCurrentIndex(1);
     }
 }
 
 void MainWindow::onImageProcessed()
 {
     ui->processImageButton->setEnabled(true);
-
-    // Обновляем список на третьей вкладке
     updateResultsList();
 
-    // Выделяем только что сохраненный файл
     if (m_justSavedImage && !m_lastSavedImage.isEmpty()) {
         selectFileInList(m_lastSavedImage);
-        m_justSavedImage = false; // Сбрасываем флаг после использования
+        m_justSavedImage = false;
     }
 
-    // Переключаемся на вкладку "Выбор рисунка"
     ui->tabWidget->setCurrentIndex(2);
 }
 
@@ -534,7 +585,6 @@ void MainWindow::onSocketError(const QString& error)
 // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
 void MainWindow::updateSendButtonState()
 {
-    // Кнопка отправки активна только при наличии текста и установленном соединении
     bool hasText = !ui->messageLineEdit->text().trimmed().isEmpty();
     bool isConnected = ui->disconnectButton->isEnabled();
     ui->sendMessageButton->setEnabled(hasText && isConnected);
@@ -542,7 +592,6 @@ void MainWindow::updateSendButtonState()
 
 void MainWindow::updateImageButtonsState()
 {
-    // Кнопки обработки и очистки активны только при загруженным изображении
     bool hasImage = !ui->imagePathLabel->text().isEmpty() &&
         ui->imagePathLabel->text() != "No file selected";
     ui->processImageButton->setEnabled(hasImage);
@@ -552,13 +601,10 @@ void MainWindow::updateImageButtonsState()
 QString MainWindow::getNextAvailableFilename()
 {
     QDir netsurfacesDir("netsurfaces");
-
-    // Create directory if it doesn't exist
     if (!netsurfacesDir.exists()) {
         netsurfacesDir.mkpath(".");
     }
 
-    // Find the next available number
     int nextNumber = 1;
     while (netsurfacesDir.exists(QString("netsurface%1.png").arg(nextNumber))) {
         nextNumber++;
@@ -576,34 +622,25 @@ void MainWindow::updateNetNameEdit()
 void MainWindow::updateResultsList()
 {
     ui->resultsListWidget->clear();
-
     QDir netsurfacesDir("netsurfaces");
     if (!netsurfacesDir.exists()) {
         netsurfacesDir.mkpath(".");
         return;
     }
 
-    // Поддерживаемые форматы изображений
     QStringList filters;
     filters << "*.png" << "*.jpg" << "*.jpeg" << "*.bmp" << "*.tiff";
-
     QFileInfoList fileList = netsurfacesDir.entryInfoList(filters, QDir::Files, QDir::Name);
 
     for (const QFileInfo& fileInfo : fileList) {
         QListWidgetItem* item = new QListWidgetItem(ui->resultsListWidget);
-
-        // Загружаем уменьшенное изображение для превью
         QPixmap pixmap(fileInfo.absoluteFilePath());
         if (!pixmap.isNull()) {
-            // Масштабируем до размера иконки
             QPixmap scaledPixmap = pixmap.scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation);
             item->setIcon(QIcon(scaledPixmap));
         }
-
         item->setText(fileInfo.fileName());
         item->setData(Qt::UserRole, fileInfo.fileName());
-
-        // Показываем полное имя файла как подсказку
         item->setToolTip(fileInfo.fileName());
     }
 }
@@ -616,24 +653,19 @@ void MainWindow::selectDefaultPattern()
     }
 
     QString patternToSelect;
-
-    // Если только что сохранили изображение - выделяем его
     if (m_justSavedImage && !m_lastSavedImage.isEmpty()) {
         patternToSelect = m_lastSavedImage;
-        m_justSavedImage = false; // Сбрасываем флаг после использования
+        m_justSavedImage = false;
     }
     else if (m_settings) {
-        // Иначе читаем из конфига
         patternToSelect = m_settings->value("General/selectedPattern").toString();
     }
 
-    // Ищем файл в списке
     if (!patternToSelect.isEmpty()) {
         selectFileInList(patternToSelect);
         return;
     }
 
-    // Если не нашли или конфиг пуст - выделяем первый элемент
     if (ui->resultsListWidget->count() > 0) {
         ui->resultsListWidget->setCurrentRow(0);
     }
@@ -641,13 +673,11 @@ void MainWindow::selectDefaultPattern()
 
 void MainWindow::selectFileInList(const QString& fileName)
 {
-    // Убедимся, что имя файла имеет расширение .png
     QString searchName = fileName;
     if (!searchName.endsWith(".png", Qt::CaseInsensitive)) {
         searchName += ".png";
     }
 
-    // Ищем файл в списке
     QList<QListWidgetItem*> items = ui->resultsListWidget->findItems(searchName, Qt::MatchExactly);
     if (!items.isEmpty()) {
         items.first()->setSelected(true);
@@ -655,7 +685,6 @@ void MainWindow::selectFileInList(const QString& fileName)
         ui->resultsListWidget->scrollToItem(items.first());
     }
     else {
-        // Если не нашли точное совпадение, выделяем первый элемент
         if (ui->resultsListWidget->count() > 0) {
             ui->resultsListWidget->setCurrentRow(0);
         }

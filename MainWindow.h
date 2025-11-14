@@ -10,6 +10,8 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QMessageBox>
+#include <QMutex>
+#include <QQueue>
 
 // Предварительное объявление классов
 class BusinessLogic;
@@ -54,8 +56,13 @@ private slots:
     void onStartVisionClicked();
     void onStopVisionClicked();
     void onVisionResultReceived(const QString& snapshotName, int xPosition, double totalTime);
-    void onVisionResultReceivedForDisplay(const QString& displayMessage);  // НОВЫЙ СЛОТ ДЛЯ ОТОБРАЖЕНИЯ РЕЗУЛЬТАТОВ
+    void onVisionResultReceivedForDisplay(const QString& displayMessage);
     void onVisionSystemError(const QString& error);
+
+    // ==================== НОВЫЕ СЛОТЫ ДЛЯ РАБОТЫ С СОКЕТОМ И СНЭПШОТАМИ ====================
+    void onSaveSnapshotsToggled(bool checked);
+    void onGetFromSocketToggled(bool checked);
+    void onSocketDataReceived(const QString& data);
 
 private:
     Ui::MainWindow* ui;
@@ -72,7 +79,13 @@ private:
     // Для работы с третьей вкладкой
     QString m_lastSavedImage;
     QSettings* m_settings;
-    bool m_justSavedImage;  // Флаг, указывающий что мы только что сохранили изображение
+    bool m_justSavedImage;
+
+    // ==================== НОВЫЕ ПЕРЕМЕННЫЕ ДЛЯ СВЯЗИ СНЭПШОТОВ И СОКЕТА ====================
+    QMutex m_dataMutex;
+    bool m_socketConnected;
+    QStringList m_pendingSocketValues;    // Список ожидающих значений из сокета
+    QStringList m_processedSnapshots;     // Список уже обработанных снэпшотов
 
     // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
     void setupConnections();
@@ -84,4 +97,12 @@ private:
     void selectDefaultPattern();
     void initializeSettings();
     void selectFileInList(const QString& fileName);
+
+    // ==================== НОВЫЕ ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
+    void updateGetFromSocketState();
+    void processDataPairing();  // ОСНОВНОЙ МЕТОД ДЛЯ СОПОСТАВЛЕНИЯ ДАННЫХ
+    void saveValuePair(const QString& snapshotName, const QString& socketValue);
+    QString findLatestUnpairedSnapshot();
+    int getSnapshotCount();  
+    int countValuePairs();   
 };

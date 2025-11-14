@@ -18,7 +18,7 @@
     <item>
      <widget class="QTabWidget" name="tabWidget">
       <property name="currentIndex">
-       <number>1</number>
+       <number>3</number>
       </property>
       <widget class="QWidget" name="socketTab">
        <attribute name="title">
@@ -380,17 +380,11 @@
            </widget>
           </item>
           <item>
-           <spacer name="horizontalSpacer_2">
-            <property name="orientation">
-             <enum>Qt::Orientation::Horizontal</enum>
+           <widget class="QCheckBox" name="getFromSockCheckBox">
+            <property name="text">
+             <string>Принимать угол</string>
             </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>40</width>
-              <height>20</height>
-             </size>
-            </property>
-           </spacer>
+           </widget>
           </item>
           <item>
            <spacer name="horizontalSpacer_4">

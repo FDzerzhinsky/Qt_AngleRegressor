@@ -1,4 +1,5 @@
 // [file name]: BusinessLogic.h
+// [file name]: BusinessLogic.h
 #pragma once
 
 #include <QObject>
@@ -51,11 +52,16 @@ signals:
     void imageCleared();
     void socketError(const QString& error);
 
-    // ==================== яхцмюкш йнлоэчрепмнцн гпемхъ ====================
+    // ==================== яхцмюкш йнлоэчрепмнцн гпемхе ====================
     void visionResultReceived(const QString& snapshotName, int xPosition, double totalTime);
     void visionResultReceivedForDisplay(const QString& displayMessage);
     void visionSystemError(const QString& error);
     void visionStatusChanged(bool running);
+
+    // =============================================================================
+    // мнбши яхцмюк дкъ оепедювх дюммшу нр янйерю б GUI
+    // =============================================================================
+    void socketDataReceived(const QString& data);
 
 private slots:
     // ==================== бмсрпеммхе якнрш ====================

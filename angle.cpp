@@ -2,6 +2,7 @@
 // ВКЛЮЧЕНИЕ БИБЛИОТЕК
 // =============================================================================
 #include "angle.h"
+#include <QDebug>  // ДОБАВЛЕНО ДЛЯ ДИАГНОСТИЧЕСКИХ СООБЩЕНИЙ
 
 // Используем пространства имен для удобства
 using namespace cv;
@@ -13,7 +14,6 @@ using namespace chrono;
 // ЧТЕНИЕ КОНФИГУРАЦИИ ОБРАБОТКИ ИЗОБРАЖЕНИЙ ИЗ ФАЙЛА
 // =============================================================================
 // Эта функция читает параметры обработки изображений из конфигурационного файла
-// Позволяет настраивать алгоритмы компьютерного зрения без перекомпиляции кода
 ImageProcessingConfig read_image_processing_config(const std::string& filename) {
     ImageProcessingConfig config;
 
@@ -48,7 +48,6 @@ ImageProcessingConfig read_image_processing_config(const std::string& filename) 
                 value.erase(value.find_last_not_of(" \t") + 1);
 
                 // Записываем значения в конфигурацию в зависимости от ключа
-                // Используем блоки try-catch для обработки ошибок преобразования типов
                 try {
                     if (key == "ref_image_path") config.ref_image_path = value;
                     else if (key == "ref_image_scale") config.ref_image_scale = stod(value);
@@ -117,7 +116,6 @@ void initialize_angle_processing(AngleContext& context) {
     }
 
     // Уменьшение размера референсного изображения для ускорения обработки
-    // Используем параметр из конфигурации вместо жестко заданного значения
     double scale = context.config.ref_image_scale;
     if (scale > 0 && scale != 1.0) {
         // Вычисляем новые размеры с учетом масштаба
@@ -179,7 +177,7 @@ bool process_frame(AngleContext& context, const cv::Mat& query_image) {
     // =========================================================================
     // Убеждаемся, что полученное изображение не пустое
     if (query_image.empty()) {
-        cout << "ERROR: Empty query image received!" << endl;
+        qDebug() << "ERROR: Empty query image received!";
         return false;
     }
 
@@ -194,13 +192,13 @@ bool process_frame(AngleContext& context, const cv::Mat& query_image) {
 
     // Проверяем, найдены ли ключевые точки на изображении
     if (kp_query.empty()) {
-        cout << "ERROR: No keypoints found in query image!" << endl;
+        qDebug() << "ERROR: No keypoints found in query image!";
         return false;
     }
 
     // Проверяем, что дескрипторы были успешно вычислены
     if (des_query.empty()) {
-        cout << "ERROR: No descriptors generated for query image!" << endl;
+        qDebug() << "ERROR: No descriptors generated for query image!";
         return false;
     }
 
@@ -226,7 +224,6 @@ bool process_frame(AngleContext& context, const cv::Mat& query_image) {
 
         // Lowe's ratio test: хорошим считается совпадение, где расстояние до
         // первого соседа значительно меньше расстояния до второго соседа
-        // Используем параметр из конфигурации вместо жестко заданного значения
         if (matches[i][0].distance < context.config.good_match_ratio * matches[i][1].distance) {
             good_matches.push_back(matches[i][0]);
         }
@@ -236,7 +233,6 @@ bool process_frame(AngleContext& context, const cv::Mat& query_image) {
     // ПРОВЕРКА ДОСТАТОЧНОСТИ СОВПАДЕНИЙ ДЛЯ ВЫЧИСЛЕНИЯ ГОМОГРАФИИ
     // =========================================================================
     // Для надежного вычисления гомографии нужно достаточно хороших совпадений
-    // Используем параметр из конфигурации вместо жестко заданного значения
     if (good_matches.size() > context.config.min_good_matches) {
         // Подготавливаем точки для вычисления гомографии
         vector<Point2f> src_pts, dst_pts;
@@ -296,20 +292,24 @@ bool process_frame(AngleContext& context, const cv::Mat& query_image) {
             context.x_position = static_cast<int>(center_x);
             context.processing_complete = true;
 
+            qDebug() << "Frame processed successfully: X =" << center_x << "Time =" << total_duration.count() / 1000.0 << "ms";
             return true; // Успешное завершение обработки
         }
         else {
-            cout << "ERROR: Homography matrix computation failed!" << endl;
+            qDebug() << "ERROR: Homography matrix computation failed!";
         }
     }
     else {
         // Выводим подробную информацию о неудачном сопоставлении
-        cout << "ERROR: Not enough good matches found (" << good_matches.size()
-            << " < " << context.config.min_good_matches << ")" << endl;
+        qDebug() << "ERROR: Not enough good matches found (" << good_matches.size()
+            << "<" << context.config.min_good_matches << ")";
 
         // Дополнительная диагностика: проверяем, есть ли вообще какие-либо совпадения
         if (matches.empty()) {
-            cout << "ERROR: No matches found at all!" << endl;
+            qDebug() << "ERROR: No matches found at all!";
+        }
+        else {
+            qDebug() << "Total matches found:" << matches.size() << "Good matches:" << good_matches.size();
         }
     }
 
@@ -320,8 +320,7 @@ bool process_frame(AngleContext& context, const cv::Mat& query_image) {
 // СОЗДАНИЕ И ИНИЦИАЛИЗАЦИЯ КОНТЕКСТА ОБРАБОТКИ ИЗОБРАЖЕНИЙ
 // =============================================================================
 // Эта функция создает и возвращает умный указатель на инициализированный контекст
-// Умный указатель (unique_ptr) автоматически управляет памятью и гарантирует
-// освобождение ресурсов при выходе из области видимости
+
 std::unique_ptr<AngleContext> create_angle_context() {
     // Создаем умный указатель на новый объект AngleContext
     // make_unique - современный и безопасный способ создания unique_ptr
