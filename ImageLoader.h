@@ -29,9 +29,9 @@ class PdfImageLoader : public ImageLoader {
 public:
     PdfImageLoader(int dpi = 300);
     QPixmap load(const QString& filePath) override;
-    bool canLoad(const QString& filePath) override;  // УБЕДИТЕСЬ, ЧТО ЭТА СТРОКА ЕСТЬ!
+    bool canLoad(const QString& filePath) override;
 private:
-    int m_dpi;  // ЧЛЕН ДЛЯ ХРАНЕНИЯ DPI
+    int m_dpi;  // ПЕРЕМЕННАЯ ДЛЯ ХРАНЕНИЯ DPI
 };
 
 // Фабрика для создания загрузчиков

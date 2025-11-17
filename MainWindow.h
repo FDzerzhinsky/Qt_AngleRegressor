@@ -12,6 +12,7 @@
 #include <QMessageBox>
 #include <QMutex>
 #include <QQueue>
+#include <QTimer>
 
 // Предварительное объявление классов
 class BusinessLogic;
@@ -64,6 +65,9 @@ private slots:
     void onGetFromSocketToggled(bool checked);
     void onSocketDataReceived(const QString& data);
 
+    // ==================== СЛОТ ДЛЯ АСИНХРОННОЙ ОБРАБОТКИ СОПОСТАВЛЕНИЯ ====================
+    void onProcessDataPairing();
+
 private:
     Ui::MainWindow* ui;
 
@@ -85,7 +89,7 @@ private:
     QMutex m_dataMutex;
     bool m_socketConnected;
     QStringList m_pendingSocketValues;    // Список ожидающих значений из сокета
-    QStringList m_processedSnapshots;     // Список уже обработанных снэпшотов
+    QTimer* m_pairingTimer;               // Таймер для отложенной обработки
 
     // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
     void setupConnections();
@@ -98,11 +102,12 @@ private:
     void initializeSettings();
     void selectFileInList(const QString& fileName);
 
-    // ==================== НОВЫЕ ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
     void updateGetFromSocketState();
     void processDataPairing();  // ОСНОВНОЙ МЕТОД ДЛЯ СОПОСТАВЛЕНИЯ ДАННЫХ
     void saveValuePair(const QString& snapshotName, const QString& socketValue);
     QString findLatestUnpairedSnapshot();
-    int getSnapshotCount();  
-    int countValuePairs();   
+    QStringList findUnpairedSnapshots();
+    QSet<QString> readPairedSnapshotsFromValues();  // чтение сопоставленных снэпшотов
+    int getSnapshotCount();
+    int countValuePairs();
 };

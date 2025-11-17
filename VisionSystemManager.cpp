@@ -25,7 +25,6 @@ VisionSystemManager::VisionSystemManager(QObject* parent)
 VisionSystemManager::~VisionSystemManager()
 {
     stopVisionSystem();
-    // ИСПРАВЛЕНА ОШИБКА: используем точку вместо -> для объекта std::thread
     if (m_visionThread.joinable()) {
         m_visionThread.join();
     }
@@ -86,7 +85,6 @@ void VisionSystemManager::stopVisionSystem()
         m_callbackContext->stop = true;
     }
 
-    // ИСПРАВЛЕНА ОШИБКА: используем точку вместо -> для объекта std::thread
     if (m_visionThread.joinable()) {
         m_visionThread.join();
         qDebug() << "Vision thread joined";

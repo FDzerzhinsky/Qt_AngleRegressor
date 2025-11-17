@@ -1,5 +1,4 @@
 // [file name]: BusinessLogic.h
-// [file name]: BusinessLogic.h
 #pragma once
 
 #include <QObject>
@@ -23,7 +22,7 @@ public:
     ~BusinessLogic();
 
 public slots:
-    // ==================== —ÀŒ ≈“€ ====================
+    // ==================== —Œ ≈“ ====================
     void connectToHost(const QString& ip, quint16 port);
     void disconnectFromHost();
     void sendMessage(const QString& message);
@@ -52,7 +51,7 @@ signals:
     void imageCleared();
     void socketError(const QString& error);
 
-    // ==================== —»√Õ¿À€  ŒÃœ‹ﬁ“≈–ÕŒ√Œ «–≈Õ»≈ ====================
+    // ==================== —»√Õ¿À€  ŒÃœ‹ﬁ“≈–ÕŒ√Œ «–≈Õ»ﬂ ====================
     void visionResultReceived(const QString& snapshotName, int xPosition, double totalTime);
     void visionResultReceivedForDisplay(const QString& displayMessage);
     void visionSystemError(const QString& error);

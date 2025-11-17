@@ -21,7 +21,7 @@
 #include <QDebug>
 #include <QMutexLocker>
 
-MainWindow::MainWindow(QWidget * parent)
+MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , m_businessLogic(new BusinessLogic)
@@ -30,6 +30,7 @@ MainWindow::MainWindow(QWidget * parent)
     , m_settings(nullptr)
     , m_justSavedImage(false)
     , m_socketConnected(false)
+    , m_pairingTimer(new QTimer(this))
 {
     ui->setupUi(this);
 
@@ -53,6 +54,10 @@ MainWindow::MainWindow(QWidget * parent)
 
     // ВЫЗЫВАЕМ ИНИЦИАЛИЗАЦИЮ БИЗНЕС-ЛОГИКИ В ЕЕ ПОТОКЕ
     QMetaObject::invokeMethod(m_businessLogic, "initialize", Qt::QueuedConnection);
+
+    // ==================== НАСТРОЙКА ТАЙМЕРА ДЛЯ АСИНХРОННОЙ ОБРАБОТКИ ====================
+    m_pairingTimer->setSingleShot(true);
+    connect(m_pairingTimer, &QTimer::timeout, this, &MainWindow::onProcessDataPairing);
 
     // ==================== ИНИЦИАЛИЗАЦИЯ СОСТОЯНИЯ ИНТЕРФЕЙСА ====================
     updateSendButtonState();
@@ -191,6 +196,14 @@ void MainWindow::setupConnections()
 }
 
 // =============================================================================
+// СЛОТ ДЛЯ АСИНХРОННОЙ ОБРАБОТКИ СОПОСТАВЛЕНИЯ (РЕШЕНИЕ ПРОБЛЕМЫ БЛОКИРОВКИ GUI)
+// =============================================================================
+void MainWindow::onProcessDataPairing()
+{
+    processDataPairing();
+}
+
+// =============================================================================
 // ОСНОВНОЙ МЕТОД ДЛЯ СОПОСТАВЛЕНИЯ СНЭПШОТОВ И ЗНАЧЕНИЙ ИЗ СОКЕТА
 // =============================================================================
 void MainWindow::processDataPairing()
@@ -205,22 +218,25 @@ void MainWindow::processDataPairing()
     int snapshotCount = getSnapshotCount();
     int valuePairsCount = countValuePairs();
 
-    qDebug() << "Snapshot count:" << snapshotCount << "Value pairs count:" << valuePairsCount;
+    qDebug() << "ProcessDataPairing - Snapshot count:" << snapshotCount << "Value pairs count:" << valuePairsCount << "Pending values:" << m_pendingSocketValues.size();
 
-    // Если снэпшотов больше чем записей - значит есть несопоставленные снэпшоты
-    if (snapshotCount > valuePairsCount) {
-        // Находим последний несопоставленный снэпшот
-        QString latestSnapshot = findLatestUnpairedSnapshot();
+    // Если снэпшотов больше чем записей И есть ожидающие значения - сопоставляем
+    if (snapshotCount > valuePairsCount && !m_pendingSocketValues.isEmpty()) {
+        // Находим все несопоставленные снэпшоты
+        QStringList unpairedSnapshots = findUnpairedSnapshots();
 
-        if (!latestSnapshot.isEmpty() && !m_pendingSocketValues.isEmpty()) {
-            // Берем первое значение из очереди
+        qDebug() << "Unpaired snapshots:" << unpairedSnapshots;
+
+        // Сопоставляем по порядку - первый несопоставленный снэпшот с первым значением из очереди
+        while (!unpairedSnapshots.isEmpty() && !m_pendingSocketValues.isEmpty()) {
+            QString snapshotName = unpairedSnapshots.takeFirst();
             QString socketValue = m_pendingSocketValues.takeFirst();
 
             // Сохраняем пару
-            saveValuePair(latestSnapshot, socketValue);
+            saveValuePair(snapshotName, socketValue);
 
-            qDebug() << "Paired snapshot:" << latestSnapshot << "with value:" << socketValue;
-            onLogMessage(QString("Paired: %1 : %2").arg(latestSnapshot).arg(socketValue));
+            qDebug() << "Paired snapshot:" << snapshotName << "with value:" << socketValue;
+            onLogMessage(QString("Paired: %1 : %2").arg(snapshotName).arg(socketValue));
         }
     }
 }
@@ -247,33 +263,89 @@ void MainWindow::saveValuePair(const QString& snapshotName, const QString& socke
 }
 
 // =============================================================================
-// ПОИСК ПОСЛЕДНЕГО НЕСОПОСТАВЛЕННОГО СНЭПШОТА
+// ПОИСК ВСЕХ НЕСОПОСТАВЛЕННЫХ СНЭПШОТОВ
 // =============================================================================
-QString MainWindow::findLatestUnpairedSnapshot()
+QStringList MainWindow::findUnpairedSnapshots()
 {
     QDir snapsDir("snaps");
+    QStringList unpairedSnapshots;
+
     if (!snapsDir.exists()) {
-        return QString();
+        qDebug() << "Snaps directory doesn't exist";
+        return unpairedSnapshots;
     }
 
-    // Получаем все PNG файлы, отсортированные по времени изменения (новые первыми)
+    // Получаем все PNG файлы, отсортированные по времени создания (старые первыми)
     QStringList filters;
     filters << "*.png";
     QFileInfoList fileList = snapsDir.entryInfoList(filters, QDir::Files, QDir::Time);
 
     if (fileList.isEmpty()) {
-        return QString();
+        qDebug() << "No snapshots found in snaps directory";
+        return unpairedSnapshots;
     }
 
-    // Количество записей в values.txt
-    int valuePairsCount = countValuePairs();
+    // Читаем уже сопоставленные снэпшоты из values.txt
+    QSet<QString> pairedSnapshots = readPairedSnapshotsFromValues();
 
-    // Если количество снэпшотов больше количества записей, берем снэпшот по индексу = количеству записей
-    if (fileList.size() > valuePairsCount) {
-        return fileList[valuePairsCount].baseName();
+    qDebug() << "Total snapshots:" << fileList.size() << "Paired snapshots:" << pairedSnapshots.size();
+
+    // Находим все несопоставленные снэпшоты
+    for (const QFileInfo& fileInfo : fileList) {
+        QString baseName = fileInfo.baseName();
+        if (!pairedSnapshots.contains(baseName)) {
+            unpairedSnapshots.append(baseName);
+            qDebug() << "Found unpaired snapshot:" << baseName;
+        }
     }
 
-    return QString();
+    // Сортируем по времени (старые первыми) чтобы сопоставлять в правильном порядке
+    unpairedSnapshots.sort();
+
+    qDebug() << "Unpaired snapshots count:" << unpairedSnapshots.size();
+    return unpairedSnapshots;
+}
+
+// =============================================================================
+// ЧТЕНИЕ УЖЕ СОПОСТАВЛЕННЫХ СНЭПШОТОВ ИЗ ФАЙЛА values.txt
+// =============================================================================
+QSet<QString> MainWindow::readPairedSnapshotsFromValues()
+{
+    QSet<QString> pairedSnapshots;
+
+    QFile file("values.txt");
+    if (!file.exists()) {
+        return pairedSnapshots;
+    }
+
+    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QTextStream in(&file);
+        while (!in.atEnd()) {
+            QString line = in.readLine().trimmed();
+            if (line.isEmpty()) continue;
+
+            // Разбираем строку формата "snap_2025-11-14_17-01-29 : SAMPLE_TEXT"
+            QStringList parts = line.split(" : ");
+            if (parts.size() >= 1) {
+                QString snapshotName = parts[0].trimmed();
+                pairedSnapshots.insert(snapshotName);
+                qDebug() << "Found paired snapshot in values.txt:" << snapshotName;
+            }
+        }
+        file.close();
+    }
+
+    return pairedSnapshots;
+}
+
+// =============================================================================
+// ПОИСК ПОСЛЕДНЕГО НЕСОПОСТАВЛЕННОГО СНЭПШОТА
+// =============================================================================
+QString MainWindow::findLatestUnpairedSnapshot()
+{
+    QStringList unpaired = findUnpairedSnapshots();
+    // Возвращаем самый старый несопоставленный снэпшот (первый в отсортированном списке)
+    return unpaired.isEmpty() ? QString() : unpaired.first();
 }
 
 // =============================================================================
@@ -305,8 +377,10 @@ int MainWindow::countValuePairs()
         QTextStream in(&file);
         int count = 0;
         while (!in.atEnd()) {
-            in.readLine();
-            count++;
+            QString line = in.readLine().trimmed();
+            if (!line.isEmpty()) {
+                count++;
+            }
         }
         file.close();
         return count;
@@ -319,6 +393,11 @@ void MainWindow::onSaveSnapshotsToggled(bool checked)
 {
     m_businessLogic->setSaveSnapshots(checked);
     updateGetFromSocketState();
+
+    // Если включили сохранение снэпшотов, запускаем проверку сопоставления
+    if (checked) {
+        QTimer::singleShot(100, this, &MainWindow::onProcessDataPairing);
+    }
 }
 
 void MainWindow::onGetFromSocketToggled(bool checked)
@@ -333,6 +412,9 @@ void MainWindow::onGetFromSocketToggled(bool checked)
                 onLogMessage("Created values.txt file");
             }
         }
+
+        // Запускаем проверку сопоставления
+        QTimer::singleShot(100, this, &MainWindow::onProcessDataPairing);
     }
     else {
         onLogMessage("Get from socket disabled");
@@ -345,13 +427,19 @@ void MainWindow::onSocketDataReceived(const QString& data)
         QMutexLocker locker(&m_dataMutex);
 
         // Добавляем значение в список ожидания
-        m_pendingSocketValues.append(data.trimmed());
+        QString trimmedData = data.trimmed();
+        if (!trimmedData.isEmpty()) {
+            m_pendingSocketValues.append(trimmedData);
+        }
 
-        // Пытаемся сопоставить данные
-        processDataPairing();
+        onLogMessage(QString("Socket data received and queued: %1").arg(data));
+        qDebug() << "Socket data received and queued:" << data;
+        qDebug() << "Queue size:" << m_pendingSocketValues.size();
 
-        onLogMessage(QString("Socket data received: %1").arg(data));
-        qDebug() << "Socket data received:" << data;
+        // ЗАПУСКАЕМ АСИНХРОННУЮ ОБРАБОТКУ ЧЕРЕЗ ТАЙМЕР (РЕШЕНИЕ ПРОБЛЕМЫ БЛОКИРОВКИ GUI)
+        if (!m_pairingTimer->isActive()) {
+            m_pairingTimer->start(50); // Запускаем через 50 мс
+        }
     }
 }
 
@@ -487,7 +575,10 @@ void MainWindow::onVisionResultReceived(const QString& snapshotName, int xPositi
 
         // При получении результата обработки кадра пытаемся сопоставить данные
         if (ui->getFromSockCheckBox->isChecked() && ui->saveSnapsCheckBox->isChecked()) {
-            processDataPairing();
+            // ЗАПУСКАЕМ АСИНХРОННУЮ ОБРАБОТКУ ЧЕРЕЗ ТАЙМЕР
+            if (!m_pairingTimer->isActive()) {
+                m_pairingTimer->start(50);
+            }
         }
 }
 

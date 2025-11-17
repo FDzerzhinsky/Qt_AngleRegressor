@@ -261,24 +261,33 @@ void BusinessLogic::sendVisionResult(const QString& snapshotName, int xPosition,
     // =========================================================================
     // ФОРМИРОВАНИЕ СООБЩЕНИЯ ДЛЯ ОТОБРАЖЕНИЯ В GUI
     // =========================================================================
-    QString displayMessage = QString("[%1] X Position: %2, Processing Time: %3 ms")
-        .arg(snapshotName)
-        .arg(xPosition)
-        .arg(totalTime, 0, 'f', 2);
+    QString displayMessage;
+
+    if (snapshotName.isEmpty()) {
+        // Это результат обработки кадра
+        displayMessage = QString("[PROCESSED] X Position: %1, Processing Time: %2 ms")
+            .arg(xPosition)
+            .arg(totalTime, 0, 'f', 2);
+    }
+    else {
+        // Это уведомление о сохранении снэпшота
+        displayMessage = QString("[SNAPSHOT] Saved: %1").arg(snapshotName);
+    }
 
     // Отправляем сообщение для отображения в GUI
     emit visionResultReceivedForDisplay(displayMessage);
 
     // =========================================================================
-    // ФОРМИРОВАНИЕ СООБЩЕНИЯ ДЛЯ ОТПРАВКИ ПО СOKЕТУ
+    // ФОРМИРОВАНИЕ СООБЩЕНИЯ ДЛЯ ОТПРАВКИ ПО СОКЕТУ (ТОЛЬКО ДЛЯ РЕЗУЛЬТАТОВ ОБРАБОТКИ)
     // =========================================================================
-    QString socketMessage = QString("%1;Position:%2;Time:%3 ms")
-        .arg(snapshotName)
-        .arg(xPosition)
-        .arg(totalTime, 0, 'f', 2);
+    if (snapshotName.isEmpty() && xPosition != 0) {
+        QString socketMessage = QString("Position:%1;Time:%2 ms")
+            .arg(xPosition)
+            .arg(totalTime, 0, 'f', 2);
 
-    // Отправляем через существующий сокет (если он открыт)
-    sendMessage(socketMessage);
+        // Отправляем через существующий сокет (если он открыт)
+        sendMessage(socketMessage);
+    }
 }
 
 // ==================== ОБРАБОТЧИКИ СОБЫТИЙ СОКЕТА ====================
