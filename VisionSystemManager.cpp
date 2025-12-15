@@ -183,7 +183,9 @@ void VisionSystemManager::saveSnapshotAsync(const cv::Mat& frame, const QString&
         };
 
     try {
-        std::async(std::launch::async, saveTask);
+        // ИСПРАВЛЕНИЕ: сохраняем возвращаемое значение std::async
+        auto future = std::async(std::launch::async, saveTask);
+        (void)future; // Игнорируем, но избегаем предупреждения
     }
     catch (const std::exception& e) {
         qWarning() << "Failed to start async snapshot save:" << e.what();
@@ -296,16 +298,17 @@ void VisionSystemManager::visionMainLoop()
                 // Обрабатываем кадр
                 if (process_frame(*m_angleContext, frame_to_process)) {
                     // УСПЕШНАЯ ОБРАБОТКА - ОТПРАВЛЯЕМ РЕЗУЛЬТАТ БЕЗ ИМЕНИ СНЭПШОТА
-                    int x_position = m_angleContext->x_position;
+                    // ИСПРАВЛЕНИЕ: используем predicted_angle вместо x_position
+                    int angle = m_angleContext->predicted_angle;
                     double total_time = m_angleContext->total_time;
 
                     // ОТПРАВЛЯЕМ ПУСТОЕ ИМЯ СНЭПШОТА, ТАК КАК ОНО ГЕНЕРИРУЕТСЯ В VisionSystemManager
-                    QMetaObject::invokeMethod(this, [this, x_position, total_time]() {
-                        emit visionResultReady("", x_position, total_time);
+                    QMetaObject::invokeMethod(this, [this, angle, total_time]() {
+                        emit visionResultReady("", angle, total_time);
                         });
 
-                    QString logMessage = QString("Frame processed: X=%1, Time=%2ms")
-                        .arg(x_position)
+                    QString logMessage = QString("Frame processed: Angle: %1°, Processing Time: %2 ms")
+                        .arg(angle)
                         .arg(total_time, 0, 'f', 2);
                     emit visionLogMessage(logMessage);
                     qDebug() << logMessage;

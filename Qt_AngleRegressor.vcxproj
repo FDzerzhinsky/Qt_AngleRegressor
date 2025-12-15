@@ -76,7 +76,7 @@
     <ClCompile>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <DisableLanguageExtensions>true</DisableLanguageExtensions>
-      <AdditionalIncludeDirectories>C:\dev\OpenCV\opencv\build\include;C:\Program Files (x86)\MVS\Development\Includes;C:\Qt\6.10.0\msvc2022_64\include;C:\dev\OpenCV\opencv\build\include\opencv2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\heil\source\repos\Qt_AngleRegressor\onnxruntime-win-x64-1.20.0\include;C:\dev\OpenCV\opencv\build\include;C:\Program Files (x86)\MVS\Development\Includes;C:\Qt\6.10.0\msvc2022_64\include;C:\dev\OpenCV\opencv\build\include\opencv2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>QT_PDF_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
@@ -97,7 +97,7 @@
     <ClCompile>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <DisableLanguageExtensions>true</DisableLanguageExtensions>
-      <AdditionalIncludeDirectories>C:\dev\OpenCV\opencv\build\include;C:\Program Files (x86)\MVS\Development\Includes;C:\Qt\6.10.0\msvc2022_64\include;C:\dev\OpenCV\opencv\build\include\opencv2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\heil\source\repos\Qt_AngleRegressor\onnxruntime-win-x64-1.20.0\include;C:\dev\OpenCV\opencv\build\include;C:\Program Files (x86)\MVS\Development\Includes;C:\Qt\6.10.0\msvc2022_64\include;C:\dev\OpenCV\opencv\build\include\opencv2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>QT_PDF_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
@@ -105,8 +105,8 @@
       <DisableSpecificWarnings>4828;4309;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>C:\Program Files %28x86%29\MVS\Development\Libraries\win64;C:\Qt\6.10.0\msvc2022_64\lib;C:\dev\OpenCV\opencv\build\x64\vc16\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Qt6Core.lib;Qt6Gui.lib;Qt6Widgets.lib;Qt6Network.lib;Qt6Concurrent.lib;Qt6Multimedia.lib;Qt6OpenGL.lib;opencv_world4120.lib;MvCameraControl.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files %28x86%29\MVS\Development\Libraries\win64;C:\Qt\6.10.0\msvc2022_64\lib;C:\dev\OpenCV\opencv\build\x64\vc16\lib;C:\Users\heil\source\repos\Qt_AngleRegressor\onnxruntime-win-x64-1.20.0\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>Qt6Core.lib;Qt6Gui.lib;Qt6Widgets.lib;Qt6Network.lib;Qt6Concurrent.lib;Qt6Multimedia.lib;Qt6OpenGL.lib;opencv_world4120.lib;MvCameraControl.lib;onnxruntime.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
@@ -139,29 +139,27 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="angle.cpp" />
-    <ClCompile Include="capture.cpp" />
-    <ClCompile Include="VisionSystemManager.cpp" />
-    <QtUic Include="CropDialog.ui" />
-    <QtUic Include="MainWindow.ui" />
     <ClCompile Include="BusinessLogic.cpp" />
+    <ClCompile Include="capture.cpp" />
     <ClCompile Include="CropDialog.cpp" />
     <ClCompile Include="ImageLoader.cpp" />
-    <ClCompile Include="MainWindow.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="MainWindow.cpp" />
+    <ClCompile Include="VisionSystemManager.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <QtMoc Include="MainWindow.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <QtMoc Include="BusinessLogic.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="platform_utils.h" />
-    <QtMoc Include="VisionSystemManager.h" />
-    <QtMoc Include="CropDialog.h" />
     <ClInclude Include="angle.h" />
     <ClInclude Include="capture.h" />
     <ClInclude Include="ImageLoader.h" />
+    <ClInclude Include="platform_utils.h" />
+    <QtMoc Include="VisionSystemManager.h" />
+    <QtMoc Include="MainWindow.h" />
+    <QtMoc Include="CropDialog.h" />
+    <QtMoc Include="BusinessLogic.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <QtUic Include="CropDialog.ui" />
+    <QtUic Include="MainWindow.ui" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">
