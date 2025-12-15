@@ -141,7 +141,6 @@
     <ClCompile Include="angle.cpp" />
     <ClCompile Include="BusinessLogic.cpp" />
     <ClCompile Include="capture.cpp" />
-    <ClCompile Include="CropDialog.cpp" />
     <ClCompile Include="ImageLoader.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MainWindow.cpp" />
@@ -154,7 +153,6 @@
     <ClInclude Include="platform_utils.h" />
     <QtMoc Include="VisionSystemManager.h" />
     <QtMoc Include="MainWindow.h" />
-    <QtMoc Include="CropDialog.h" />
     <QtMoc Include="BusinessLogic.h" />
   </ItemGroup>
   <ItemGroup>

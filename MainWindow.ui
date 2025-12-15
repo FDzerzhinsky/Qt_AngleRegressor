@@ -18,7 +18,7 @@
     <item>
      <widget class="QTabWidget" name="tabWidget">
       <property name="currentIndex">
-       <number>3</number>
+       <number>2</number>
       </property>
       <widget class="QWidget" name="socketTab">
        <attribute name="title">
@@ -137,167 +137,9 @@
         </item>
        </layout>
       </widget>
-      <widget class="QWidget" name="imageTab">
-       <attribute name="title">
-        <string>Развёртка</string>
-       </attribute>
-       <layout class="QVBoxLayout" name="imageTabLayout">
-        <item>
-         <widget class="QGroupBox" name="loadGroupBox">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-            <horstretch>0</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-          <property name="maximumSize">
-           <size>
-            <width>16777215</width>
-            <height>80</height>
-           </size>
-          </property>
-          <property name="title">
-           <string>Загрузка изображения</string>
-          </property>
-          <layout class="QHBoxLayout" name="loadLayout">
-           <item>
-            <widget class="QLabel" name="setDPILabel">
-             <property name="text">
-              <string>Установить DPI</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QLineEdit" name="SetDPILineEdit">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="maximumSize">
-              <size>
-               <width>40</width>
-               <height>16777215</height>
-              </size>
-             </property>
-             <property name="text">
-              <string>300</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QPushButton" name="loadImageButton">
-             <property name="text">
-              <string>Загрузить изображение</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QLabel" name="imagePathLabel">
-             <property name="text">
-              <string>Файл не выбран</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <spacer name="horizontalSpacer_5">
-             <property name="orientation">
-              <enum>Qt::Orientation::Horizontal</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>40</width>
-               <height>20</height>
-              </size>
-             </property>
-            </spacer>
-           </item>
-          </layout>
-         </widget>
-        </item>
-        <item>
-         <widget class="QGroupBox" name="previewGroupBox">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
-            <horstretch>0</horstretch>
-            <verstretch>1</verstretch>
-           </sizepolicy>
-          </property>
-          <property name="title">
-           <string>Превью изображения</string>
-          </property>
-          <layout class="QVBoxLayout" name="previewLayout">
-           <item>
-            <widget class="QLabel" name="imagePreviewLabel">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-               <horstretch>0</horstretch>
-               <verstretch>1</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="minimumSize">
-              <size>
-               <width>400</width>
-               <height>300</height>
-              </size>
-             </property>
-             <property name="frameShape">
-              <enum>QFrame::Shape::Box</enum>
-             </property>
-             <property name="text">
-              <string>Развёртка банки</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignmentFlag::AlignCenter</set>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <layout class="QHBoxLayout" name="imageActionsLayout">
-             <item>
-              <widget class="QPushButton" name="clearImageButton">
-               <property name="text">
-                <string>Очистить</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <spacer name="imageActionsSpacer">
-               <property name="orientation">
-                <enum>Qt::Orientation::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>40</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-             <item>
-              <widget class="QLineEdit" name="netnamelineEdit"/>
-             </item>
-             <item>
-              <widget class="QPushButton" name="processImageButton">
-               <property name="enabled">
-                <bool>false</bool>
-               </property>
-               <property name="text">
-                <string>Сохранить</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </item>
-          </layout>
-         </widget>
-        </item>
-       </layout>
-      </widget>
       <widget class="QWidget" name="resultsTab">
        <attribute name="title">
-        <string>Выбор рисунка</string>
+        <string>Выбор модели</string>
        </attribute>
        <layout class="QVBoxLayout" name="resultsTabLayout">
         <item>

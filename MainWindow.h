@@ -16,7 +16,6 @@
 
 // Предварительное объявление классов
 class BusinessLogic;
-class CropDialog;
 namespace Ui { class MainWindow; }
 
 class MainWindow : public QMainWindow
@@ -35,12 +34,7 @@ private slots:
     void onSendMessageClicked();
     void onMessageTextChanged(const QString& text);
 
-    // ==================== СЛОТЫ ДЛЯ ВКЛАДКИ "РАЗВЁРТКА" ====================
-    void onLoadImageClicked();
-    void onProcessImageClicked();
-    void onClearImageClicked();
-
-    // ==================== СЛОТЫ ДЛЯ ВКЛАДКИ "ВЫБОР РИСУНКА" ====================
+    // ==================== СЛОТЫ ДЛЯ ВКЛАДКИ "ВЫБОР МОДЕЛИ" ====================
     void onResultsTabActivated();
     void onSelectPatternClicked();
     void onPatternSelectionChanged();
@@ -48,9 +42,6 @@ private slots:
     // ==================== СЛОТЫ ДЛЯ ОБРАБОТКИ СИГНАЛОВ ОТ БИЗНЕС-ЛОГИКИ ====================
     void onLogMessage(const QString& message);
     void onConnectionStateChanged(bool connected);
-    void onImageLoaded(const QPixmap& preview, const QString& fileName);
-    void onImageProcessed();
-    void onImageCleared();
     void onSocketError(const QString& error);
 
     // ==================== СЛОТЫ ДЛЯ КОМПЬЮТЕРНОГО ЗРЕНИЯ ====================
@@ -75,17 +66,8 @@ private:
     BusinessLogic* m_businessLogic;
     QThread* m_businessThread;
 
-    // Диалог кадрирования и данные изображения
-    CropDialog* m_cropDialog;
-    QPixmap m_currentImage;
-    QPixmap m_croppedImage;
-
-    // Для работы с третьей вкладкой
-    QString m_lastSavedImage;
+    // Для работы с сопоставлениями и очередь сокета
     QSettings* m_settings;
-    bool m_justSavedImage;
-
-    // ==================== НОВЫЕ ПЕРЕМЕННЫЕ ДЛЯ СВЯЗИ СНЭПШОТОВ И СОКЕТА ====================
     QMutex m_dataMutex;
     bool m_socketConnected;
     QStringList m_pendingSocketValues;    // Список ожидающих значений из сокета
@@ -94,15 +76,11 @@ private:
     // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
     void setupConnections();
     void updateSendButtonState();
-    void updateImageButtonsState();
-    QString getNextAvailableFilename();
-    void updateNetNameEdit();
     void updateResultsList();
     void selectDefaultPattern();
     void initializeSettings();
     void selectFileInList(const QString& fileName);
 
-    void updateGetFromSocketState();
     void processDataPairing();  // ОСНОВНОЙ МЕТОД ДЛЯ СОПОСТАВЛЕНИЯ ДАННЫХ
     void saveValuePair(const QString& snapshotName, const QString& socketValue);
     QString findLatestUnpairedSnapshot();
