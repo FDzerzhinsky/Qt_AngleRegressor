@@ -106,7 +106,7 @@
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>C:\Program Files %28x86%29\MVS\Development\Libraries\win64;C:\Qt\6.10.0\msvc2022_64\lib;C:\dev\OpenCV\opencv\build\x64\vc16\lib;C:\Users\heil\source\repos\Qt_AngleRegressor\onnxruntime-win-x64-1.20.0\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Qt6Core.lib;Qt6Gui.lib;Qt6Widgets.lib;Qt6Network.lib;Qt6Concurrent.lib;Qt6Multimedia.lib;Qt6OpenGL.lib;opencv_world4120.lib;MvCameraControl.lib;onnxruntime.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Qt6Core.lib;Qt6Gui.lib;Qt6Widgets.lib;Qt6Network.lib;Qt6Concurrent.lib;Qt6Multimedia.lib;Qt6OpenGL.lib;opencv_world4120.lib;MvCameraControl.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
